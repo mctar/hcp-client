@@ -47,8 +47,8 @@ function startClient() {
 // Connect to WebSocket server
 function connectToServer() {
   try {
-    // Construct WebSocket URL
-    const wsUrl = `ws://${serverAddress}`;
+    // Construct WebSocket URL with proper protocol support
+    const wsUrl = getWebSocketURL(serverAddress);
 
     document.getElementById('connectStatus').textContent = 'Establishing connection...';
 

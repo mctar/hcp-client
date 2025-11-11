@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HCP - Scan to Join</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      padding: 20px;
+    }
+
+    .container {
+      text-align: center;
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .logo {
+      font-size: 120px;
+      margin-bottom: 30px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    h1 {
+      font-size: 3.5em;
+      margin-bottom: 20px;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .tagline {
+      font-size: 1.5em;
+      margin-bottom: 50px;
+      opacity: 0.9;
+    }
+
+    .qr-container {
+      background: white;
+      padding: 40px;
+      border-radius: 30px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+      display: inline-block;
+      margin-bottom: 40px;
+    }
+
+    #qrcode {
+      display: inline-block;
+    }
+
+    #qrcode img {
+      display: block;
+      border-radius: 10px;
+    }
+
+    .instructions {
+      font-size: 1.8em;
+      font-weight: 600;
+      margin-bottom: 30px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .info {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border-radius: 20px;
+      padding: 30px;
+      margin-top: 40px;
+      font-size: 1.1em;
+      line-height: 1.6;
+    }
+
+    .server-url {
+      font-family: 'Courier New', monospace;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 15px 20px;
+      border-radius: 10px;
+      margin-top: 20px;
+      font-size: 1em;
+      word-break: break-all;
+    }
+
+    .status {
+      margin-top: 20px;
+      font-size: 0.9em;
+      opacity: 0.8;
+    }
+
+    .error {
+      background: rgba(220, 38, 38, 0.2);
+      border: 2px solid rgba(220, 38, 38, 0.5);
+      color: #fecaca;
+      padding: 20px;
+      border-radius: 15px;
+      margin-top: 30px;
+      font-size: 1.1em;
+    }
+
+    @media (max-width: 768px) {
+      h1 {
+        font-size: 2.5em;
+      }
+
+      .logo {
+        font-size: 80px;
+      }
+
+      .tagline {
+        font-size: 1.2em;
+      }
+
+      .instructions {
+        font-size: 1.4em;
+      }
+
+      .qr-container {
+        padding: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">🤖</div>
+    <h1>Human Client Protocol</h1>
+    <p class="tagline">Join the performance</p>
+
+    <p class="instructions">Scan this QR code with your phone</p>
+
+    <div class="qr-container">
+      <div id="qrcode"></div>
+    </div>
+
+    <div class="info">
+      <p><strong>How to join:</strong></p>
+      <ol style="text-align: left; margin: 20px auto; max-width: 500px;">
+        <li>Scan the QR code with your phone's camera</li>
+        <li>Open the link in your browser</li>
+        <li>Follow the on-screen instructions</li>
+        <li>Wait to receive your first task</li>
+      </ol>
+
+      <div class="server-url" id="serverUrl">Loading...</div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div id="errorMsg" class="error" style="display: none;"></div>
+  </div>
+
+  <!-- QRCode.js library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="config.js"></script>
+  <script>
+    // Get configuration
+    const config = getServerConfig();
+
+    // Construct the client URL with server parameter
+    const githubPagesUrl = 'https://mctar.github.io/hcp-client/';
+    const serverParam = encodeURIComponent(config.server);
+    const clientUrl = `${githubPagesUrl}?server=${serverParam}`;
+
+    // Display server URL
+    document.getElementById('serverUrl').textContent = `Server: ${config.server}`;
+    document.getElementById('status').textContent = `Mode: ${CONFIG.mode}`;
+
+    // Show error if server not configured
+    if (config.server === 'YOUR_NGROK_URL_HERE') {
+      document.getElementById('errorMsg').style.display = 'block';
+      document.getElementById('errorMsg').innerHTML =
+        '<strong>⚠️ Configuration Required</strong><br>' +
+        'Please update config.js with your ngrok URL before using this QR code.';
+    }
+
+    // Generate QR code
+    try {
+      new QRCode(document.getElementById('qrcode'), {
+        text: clientUrl,
+        width: 400,
+        height: 400,
+        colorDark: '#333333',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      document.getElementById('errorMsg').style.display = 'block';
+      document.getElementById('errorMsg').textContent =
+        'Error generating QR code: ' + error.message;
+    }
+  </script>
+</body>
+</html>
