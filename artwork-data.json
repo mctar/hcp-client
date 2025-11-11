@@ -46,5 +46,13 @@
     "participants": 311,
     "rounds": 5,
     "description": "Performance on 11/11/2025"
+  },
+  {
+    "title": "Cluj #7 Simulation run",
+    "timestamp": "2025-11-11T20:05:25.861Z",
+    "imageUrl": "mycelial-artwork-2025-11-11T20-05-25.png",
+    "participants": 241,
+    "rounds": 7,
+    "description": "Performance on 11/11/2025"
   }
 ]
