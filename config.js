@@ -12,12 +12,12 @@ const CONFIG = {
   // Update this with your ngrok URL (without protocol prefix)
   // Example: 'abc123.ngrok.io'
   production: {
-    server: 'YOUR_NGROK_URL_HERE',
+    server: 'collocative-untenuously-julee.ngrok-free.dev',
     protocol: 'wss'
   },
 
   // Set to 'production' when using ngrok, 'development' for local testing
-  mode: 'development'
+  mode: 'production'
 };
 
 // Helper function to get current server configuration
