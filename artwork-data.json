@@ -22,5 +22,13 @@
     "participants": 201,
     "rounds": 5,
     "description": "AI stand in's for human tools to stress test"
+  },
+  {
+    "title": "Cluj #3 Simulation run",
+    "timestamp": "2025-11-11T18:28:39.618Z",
+    "imageUrl": "mycelial-artwork-2025-11-11T18-28-39.png",
+    "participants": 241,
+    "rounds": 5,
+    "description": "Performance on 11/11/2025"
   }
 ]
