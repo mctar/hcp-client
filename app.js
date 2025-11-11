@@ -1,63 +1,75 @@
-// Human Client Protocol - Client Application
+// HCP Performance Client - Simplified for Stage Performance
 let ws = null;
 let serverAddress = null;
 let clientId = null;
 let reconnectAttempts = 0;
-const MAX_RECONNECT_ATTEMPTS = 5;
+const MAX_RECONNECT_ATTEMPTS = 10;
+let wakeLock = null;
 
-// Get server address from URL parameter
+// Get server address from URL parameter or config
 function getServerAddress() {
   const urlParams = new URLSearchParams(window.location.search);
-  return urlParams.get('server');
+  const serverParam = urlParams.get('server');
+
+  if (serverParam) {
+    return serverParam;
+  }
+
+  // Use config if available
+  if (typeof getServerConfig === 'function') {
+    const config = getServerConfig();
+    return config.server;
+  }
+
+  if (!window.location.hostname.includes('github.io') && !window.location.hostname.includes('humancontrolprotocol.com')) {
+    return window.location.host;
+  }
+
+  return null;
 }
 
 // Show a specific screen
 function showScreen(screenId) {
-  // Hide all screens
   document.querySelectorAll('.screen').forEach(screen => {
     screen.classList.remove('active');
   });
 
-  // Show requested screen
   const screen = document.getElementById(screenId);
   if (screen) {
     screen.classList.add('active');
   }
 }
 
-// Start the client
-function startClient() {
+// Connect to WebSocket server
+function connectToServer() {
   serverAddress = getServerAddress();
 
   if (!serverAddress) {
-    showError('No server address provided. Please scan the QR code again.');
+    showError('No server address provided');
     return;
   }
 
-  // Show server info
-  document.getElementById('serverInfo').textContent = `Server: ${serverAddress}`;
-
-  // Show connecting screen
-  showScreen('connecting');
-
-  // Connect to WebSocket server
-  connectToServer();
-}
-
-// Connect to WebSocket server
-function connectToServer() {
   try {
-    // Construct WebSocket URL with proper protocol support
-    const wsUrl = getWebSocketURL(serverAddress);
+    // Use the config helper if available, otherwise build URL manually
+    let wsUrl;
+    if (typeof getWebSocketURL === 'function') {
+      wsUrl = getWebSocketURL(serverAddress);
+    } else {
+      // Auto-detect protocol
+      if (serverAddress.startsWith('localhost') || serverAddress.startsWith('127.0.0.1')) {
+        wsUrl = `ws://${serverAddress}`;
+      } else {
+        wsUrl = `wss://${serverAddress}`;
+      }
+    }
 
-    document.getElementById('connectStatus').textContent = 'Establishing connection...';
+    console.log('Connecting to:', wsUrl);
 
     ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
-      console.log('Connected to HCP server');
+      console.log('Connected to server');
       reconnectAttempts = 0;
-      document.getElementById('connectStatus').textContent = 'Connected! Initializing...';
     };
 
     ws.onmessage = (event) => {
@@ -71,67 +83,52 @@ function connectToServer() {
 
     ws.onerror = (error) => {
       console.error('WebSocket error:', error);
-      showError('Connection error. Please check your network and try again.');
     };
 
     ws.onclose = () => {
       console.log('Disconnected from server');
 
-      // Attempt to reconnect if not on error screen
-      if (document.getElementById('error').classList.contains('active')) {
-        return;
-      }
-
+      // Attempt to reconnect
       if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
         reconnectAttempts++;
-        console.log(`Attempting to reconnect (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})...`);
+        console.log(`Reconnecting... (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`);
 
         setTimeout(() => {
           showScreen('connecting');
-          document.getElementById('connectStatus').textContent = `Reconnecting... (Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})`;
           connectToServer();
         }, 2000);
       } else {
-        showError('Lost connection to server. Please refresh to try again.');
+        showError('Lost connection to server');
       }
     };
 
   } catch (error) {
-    console.error('Error connecting to server:', error);
-    showError('Failed to connect to server. Please try again.');
+    console.error('Error connecting:', error);
+    showError('Connection failed');
   }
 }
 
 // Handle messages from server
 function handleServerMessage(data) {
-  console.log('Received message:', data);
+  console.log('Received:', data);
 
   switch (data.type) {
     case 'connected':
-      // Store client ID
       clientId = data.clientId;
-      document.getElementById('clientIdDisplay').textContent = `ID: ${clientId}`;
-
       // Send ready signal
       sendMessage({ type: 'ready' });
-
       // Show idle screen
       showScreen('idle');
       break;
 
     case 'instruction':
       // Display instruction
-      displayInstruction(data.instruction, data.timestamp);
+      displayInstruction(data.instruction);
       break;
 
     case 'acknowledged':
-      // Task completion acknowledged
-      showScreen('completing');
-
-      // Return to idle after 2 seconds
-      setTimeout(() => {
-        showScreen('idle');
-      }, 2000);
+      // Return to idle immediately
+      showScreen('idle');
       break;
 
     case 'heartbeat_ack':
@@ -144,30 +141,21 @@ function handleServerMessage(data) {
 }
 
 // Display instruction to user
-function displayInstruction(instruction, timestamp) {
+function displayInstruction(instruction) {
   document.getElementById('instructionText').textContent = instruction;
-
-  if (timestamp) {
-    const date = new Date(timestamp);
-    document.getElementById('timestamp').textContent = date.toLocaleTimeString();
-  }
-
   showScreen('instruction');
 }
 
 // User completes task
 function completeTask() {
-  const btn = document.getElementById('completeBtn');
+  const btn = document.getElementById('doneBtn');
   btn.disabled = true;
-  btn.textContent = 'Sending...';
 
   sendMessage({ type: 'task_completed' });
 
-  // Re-enable button after 2 seconds
   setTimeout(() => {
     btn.disabled = false;
-    btn.textContent = '✓ Task Completed';
-  }, 2000);
+  }, 1000);
 }
 
 // Send message to server
@@ -175,7 +163,7 @@ function sendMessage(data) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
   } else {
-    console.error('WebSocket is not connected');
+    console.error('WebSocket not connected');
   }
 }
 
@@ -190,19 +178,17 @@ setInterval(() => {
   if (ws && ws.readyState === WebSocket.OPEN) {
     sendMessage({ type: 'heartbeat' });
   }
-}, 30000); // Every 30 seconds
+}, 30000);
 
-// Prevent screen from sleeping on mobile
-let wakeLock = null;
-
+// Request wake lock to prevent screen sleep
 async function requestWakeLock() {
   if ('wakeLock' in navigator) {
     try {
       wakeLock = await navigator.wakeLock.request('screen');
-      console.log('Screen wake lock acquired');
+      console.log('Wake lock acquired');
 
       wakeLock.addEventListener('release', () => {
-        console.log('Screen wake lock released');
+        console.log('Wake lock released');
       });
     } catch (err) {
       console.log('Wake lock error:', err);
@@ -210,37 +196,22 @@ async function requestWakeLock() {
   }
 }
 
-// Request wake lock when user starts
-document.getElementById('startBtn').addEventListener('click', () => {
-  requestWakeLock();
-});
-
-// Re-request wake lock when page becomes visible again
-document.addEventListener('visibilitychange', () => {
+// Re-request wake lock when page becomes visible
+document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'visible' && !wakeLock) {
-    requestWakeLock();
+    await requestWakeLock();
   }
 });
 
-// Check for server parameter on load
-window.addEventListener('DOMContentLoaded', () => {
-  const serverParam = getServerAddress();
+// Auto-connect on page load
+window.addEventListener('DOMContentLoaded', async () => {
+  // Request wake lock
+  await requestWakeLock();
 
-  if (!serverParam) {
-    // Show error on onboarding screen
-    const startBtn = document.getElementById('startBtn');
-    startBtn.disabled = true;
-    startBtn.textContent = 'No Server Address';
-
-    const content = document.querySelector('#onboarding .content');
-    const errorBox = document.createElement('div');
-    errorBox.className = 'info-box';
-    errorBox.style.background = '#fee2e2';
-    errorBox.style.borderLeft = '4px solid #dc2626';
-    errorBox.innerHTML = '<p style="color: #dc2626; margin: 0;"><strong>Error:</strong> No server address in URL. Please scan a valid QR code.</p>';
-
-    content.insertBefore(errorBox, startBtn);
-  }
+  // Start connecting
+  setTimeout(() => {
+    connectToServer();
+  }, 500);
 });
 
 // Cleanup on page unload
@@ -248,7 +219,6 @@ window.addEventListener('beforeunload', () => {
   if (ws) {
     ws.close();
   }
-
   if (wakeLock) {
     wakeLock.release();
   }
