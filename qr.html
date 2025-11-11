@@ -171,9 +171,9 @@
     const config = getServerConfig();
 
     // Construct the client URL with server parameter
-    const githubPagesUrl = 'https://mctar.github.io/hcp-client/';
+    const clientBaseUrl = 'https://humancontrolprotocol.com/';
     const serverParam = encodeURIComponent(config.server);
-    const clientUrl = `${githubPagesUrl}?server=${serverParam}`;
+    const clientUrl = `${clientBaseUrl}?server=${serverParam}`;
 
     // Display server URL
     document.getElementById('serverUrl').textContent = `Server: ${config.server}`;
