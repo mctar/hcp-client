@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>HCP Performance</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Connecting Screen -->
+    <div id="connecting" class="screen active">
+      <div class="fullscreen-content">
+        <div class="loader"></div>
+        <h1>CONNECTING</h1>
+      </div>
+    </div>
+
+    <!-- Idle Screen (Waiting) -->
+    <div id="idle" class="screen">
+      <div class="fullscreen-content">
+        <div class="status-pulse"></div>
+        <h1>READY</h1>
+        <p class="subtitle">Waiting for instructions...</p>
+      </div>
+    </div>
+
+    <!-- Instruction Screen -->
+    <div id="instruction" class="screen">
+      <div class="fullscreen-content">
+        <div class="instruction-display">
+          <p id="instructionText">STAND UP</p>
+        </div>
+        <button id="doneBtn" class="done-button" onclick="completeTask()">
+          DONE
+        </button>
+      </div>
+    </div>
+
+    <!-- Error Screen -->
+    <div id="error" class="screen">
+      <div class="fullscreen-content">
+        <h1>CONNECTION ERROR</h1>
+        <p id="errorMessage">Unable to connect</p>
+        <button class="retry-button" onclick="location.reload()">RETRY</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

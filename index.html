@@ -2,54 +2,147 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>HCP Performance</title>
-  <link rel="stylesheet" href="styles.css">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Human Control Protocol</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      min-height: 100vh;
+      padding: 60px 20px;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 3em;
+      font-weight: 900;
+      letter-spacing: 0.1em;
+      margin-bottom: 40px;
+      text-transform: uppercase;
+      line-height: 1.1;
+    }
+
+    .tagline {
+      font-size: 1.3em;
+      font-weight: 300;
+      margin-bottom: 60px;
+      opacity: 0.9;
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: 1.1em;
+      font-weight: 300;
+      margin-bottom: 30px;
+      opacity: 0.85;
+    }
+
+    .credits {
+      margin-top: 80px;
+      padding-top: 40px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.95em;
+      opacity: 0.7;
+    }
+
+    .links {
+      margin-top: 60px;
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .link-btn {
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #fff;
+      padding: 15px 35px;
+      border-radius: 10px;
+      font-size: 1em;
+      font-weight: 300;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: all 0.2s;
+      display: inline-block;
+    }
+
+    .link-btn:hover {
+      background: #222;
+      border-color: #555;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 40px 20px;
+      }
+
+      h1 {
+        font-size: 2em;
+      }
+
+      .tagline {
+        font-size: 1.1em;
+      }
+
+      p {
+        font-size: 1em;
+      }
+
+      .links {
+        flex-direction: column;
+      }
+
+      .link-btn {
+        text-align: center;
+      }
+    }
+  </style>
 </head>
 <body>
-  <div id="app">
-    <!-- Connecting Screen -->
-    <div id="connecting" class="screen active">
-      <div class="fullscreen-content">
-        <div class="loader"></div>
-        <h1>CONNECTING</h1>
-      </div>
+  <div class="container">
+    <h1>Human Control Protocol</h1>
+
+    <div class="tagline">
+      An AI Agent director. An audience become tools. A performance that writes itself in real time.
     </div>
 
-    <!-- Idle Screen (Waiting) -->
-    <div id="idle" class="screen">
-      <div class="fullscreen-content">
-        <div class="status-pulse"></div>
-        <h1>READY</h1>
-        <p class="subtitle">Waiting for instructions...</p>
-      </div>
+    <p>
+      Human Control Protocol (HCP) is a live performance system created by Lena Thorsmæhlum and Thordur Arnason at Gervi Labs. In each performance an AI agent directs a room of people using their phones, turning a seated audience into the main instrument of the work.
+    </p>
+
+    <p>
+      Participants connect through a simple web app. During the piece, their phones display short, clear instructions from the AI. Raise your hand. Look left. Stand up, then sit. Smile. Breathe. People can follow, delay, reinterpret, or ignore each instruction. Out of these individual choices a shared choreography appears.
+    </p>
+
+    <p>
+      Each performance leaves a small digital fossil. The event survives as data, as an abstract image, and as human memory. All three are incomplete. All three are true.
+    </p>
+
+    <p>
+      HCP deliberately inverts the usual story of AI as a tool for humans. Here the AI has the role of director, and humans are addressed as "tools." The term is used as a provocation, not an insult. It asks what it feels like to be used, to consent to being directed. It explores where agency lives inside that structure.
+    </p>
+
+    <div class="links">
+      <a href="client.html" class="link-btn">Join Performance</a>
+      <a href="gallery.html" class="link-btn">View Gallery</a>
     </div>
 
-    <!-- Instruction Screen -->
-    <div id="instruction" class="screen">
-      <div class="fullscreen-content">
-        <div class="instruction-display">
-          <p id="instructionText">STAND UP</p>
-        </div>
-        <button id="doneBtn" class="done-button" onclick="completeTask()">
-          DONE
-        </button>
-      </div>
-    </div>
-
-    <!-- Error Screen -->
-    <div id="error" class="screen">
-      <div class="fullscreen-content">
-        <h1>CONNECTION ERROR</h1>
-        <p id="errorMessage">Unable to connect</p>
-        <button class="retry-button" onclick="location.reload()">RETRY</button>
-      </div>
+    <div class="credits">
+      Created by Lena Thorsmæhlum and Thordur Arnason at Gervi Labs
     </div>
   </div>
-
-  <script src="config.js"></script>
-  <script src="app.js"></script>
 </body>
 </html>
