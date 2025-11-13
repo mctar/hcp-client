@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>HCP - Performance Gallery</title>
+  <script src="config.js"></script>
   <style>
     * {
       margin: 0;
@@ -136,6 +137,39 @@
       padding: 5px 12px;
       border-radius: 5px;
       border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .delete-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 59, 48, 0.9);
+      border: 1px solid rgba(255, 59, 48, 1);
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+      z-index: 10;
+      opacity: 0;
+    }
+
+    .gallery-item:hover .delete-btn {
+      opacity: 1;
+    }
+
+    .delete-btn:hover {
+      background: rgba(255, 59, 48, 1);
+      transform: scale(1.1);
+    }
+
+    .gallery-item {
+      position: relative;
     }
 
     .empty-state {
@@ -290,8 +324,8 @@
 
   <div class="gallery-container">
     <div class="filters" id="filters">
-      <button class="filter-btn active" data-filter="all">All</button>
-      <button class="filter-btn" data-filter="recent">Recent</button>
+      <button class="filter-btn" data-filter="all">All</button>
+      <button class="filter-btn active" data-filter="recent">Recent</button>
       <button class="filter-btn" data-filter="popular">Most Participants</button>
     </div>
 
@@ -326,7 +360,7 @@
     const ARTWORK_DATA_URL = 'artwork-data.json'; // Will be served from GitHub Pages
 
     let artworkData = [];
-    let currentFilter = 'all';
+    let currentFilter = 'recent'; // Default to recent
 
     // Initialize gallery
     async function initGallery() {
@@ -383,12 +417,12 @@
     function createGalleryCard(item, index) {
       const card = document.createElement('div');
       card.className = 'gallery-item';
-      card.onclick = () => openModal(item);
 
       const date = new Date(item.timestamp);
       const formattedDate = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
 
       card.innerHTML = `
+        <button class="delete-btn" title="Delete artwork">×</button>
         <img src="${item.imageUrl}" alt="${item.title}" loading="lazy">
         <div class="item-info">
           <div class="item-title">${item.title}</div>
@@ -400,7 +434,79 @@
         </div>
       `;
 
+      // Add click handler for the card (open modal)
+      card.addEventListener('click', (e) => {
+        if (!e.target.classList.contains('delete-btn')) {
+          openModal(item);
+        }
+      });
+
+      // Add delete handler
+      const deleteBtn = card.querySelector('.delete-btn');
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        deleteArtwork(item, index);
+      });
+
       return card;
+    }
+
+    async function deleteArtwork(item, index) {
+      const confirmed = confirm(`Delete "${item.title}"?\n\nThis will permanently remove this artwork from the gallery and GitHub Pages.`);
+
+      if (!confirmed) return;
+
+      // Prompt for admin password
+      const adminPassword = prompt('Enter admin password to delete artwork:');
+
+      if (!adminPassword) {
+        alert('Delete cancelled - no password provided.');
+        return;
+      }
+
+      try {
+        // Get server URL from config
+        const config = getServerConfig();
+        const httpProtocol = config.server.startsWith('localhost') || config.server.startsWith('127.0.0.1') ? 'http' : 'https';
+        const serverUrl = `${httpProtocol}://${config.server}`;
+
+        console.log(`[Admin] Deleting ${item.imageUrl} via ${serverUrl}`);
+
+        // Call server delete endpoint
+        const response = await fetch(`${serverUrl}/api/admin/delete-artwork`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            filename: item.imageUrl,
+            adminPassword: adminPassword
+          })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Delete failed');
+        }
+
+        console.log('[Admin] Delete successful:', result);
+        alert(`Artwork deleted successfully!\n\n"${item.title}" has been removed from the gallery and GitHub Pages.`);
+
+        // Reload gallery data from server
+        await initGallery();
+
+      } catch (error) {
+        console.error('[Admin] Error deleting artwork:', error);
+
+        if (error.message.includes('Invalid admin password')) {
+          alert('Delete failed: Invalid admin password.');
+        } else if (error.message.includes('not configured')) {
+          alert('Delete failed: Admin password not configured on server.\n\nPlease set ADMIN_PASSWORD in the server .env file.');
+        } else {
+          alert(`Delete failed: ${error.message}`);
+        }
+      }
     }
 
     function openModal(item) {
