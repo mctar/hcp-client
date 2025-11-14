@@ -395,6 +395,16 @@
     function setup() {
       createCanvas(windowWidth, windowHeight);
       agent = new Agent(width / 2, height / 2);
+
+      // Initialize group colors
+      groupColors = [
+        color(255, 100, 100), // Red
+        color(100, 255, 100), // Green
+        color(100, 100, 255), // Blue
+        color(255, 255, 100), // Yellow
+        color(255, 100, 255), // Magenta
+        color(100, 255, 255), // Cyan
+      ];
     }
 
     // p5.js draw loop
@@ -431,15 +441,8 @@
       }
     }
 
-    // Event colors for different groups
-    const groupColors = [
-      color(255, 100, 100), // Red
-      color(100, 255, 100), // Green
-      color(100, 100, 255), // Blue
-      color(255, 255, 100), // Yellow
-      color(255, 100, 255), // Magenta
-      color(100, 255, 255), // Cyan
-    ];
+    // Event colors for different groups (initialized in setup)
+    let groupColors;
 
     // Process events at appropriate times
     function processEvents() {
