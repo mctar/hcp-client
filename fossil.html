@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>HCP - Fossil Record</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <title>HCP - Stratigraphic Analysis</title>
   <style>
     * {
       margin: 0;
@@ -15,663 +14,218 @@
     body {
       font-family: 'Courier New', monospace;
       background: #0a0a0a;
-      color: #999;
-      overflow: hidden;
+      color: #666;
+      overflow-x: hidden;
     }
 
-    #controls {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 100;
-      background: rgba(10, 10, 10, 0.95);
+    #container {
+      display: flex;
+      height: 100vh;
+    }
+
+    #sidebar {
+      width: 300px;
+      background: #0a0a0a;
+      border-right: 1px solid #222;
       padding: 20px;
-      border-radius: 3px;
-      border: 1px solid #333;
-      max-width: 300px;
+      overflow-y: auto;
     }
 
-    #controls h2 {
-      font-size: 0.9em;
+    #sidebar h1 {
+      font-size: 0.85em;
       font-weight: 400;
       letter-spacing: 0.2em;
       text-transform: uppercase;
-      margin-bottom: 15px;
-      color: #666;
+      margin-bottom: 20px;
+      color: #444;
     }
 
-    #controls label {
-      display: block;
-      font-size: 0.75em;
-      margin-bottom: 5px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-    }
-
-    #controls input[type="file"],
-    #controls input[type="range"] {
+    #file-input {
       width: 100%;
+      margin-bottom: 30px;
+      font-size: 0.75em;
+    }
+
+    .metadata {
+      font-size: 0.7em;
+      line-height: 1.8;
+      margin-bottom: 30px;
+    }
+
+    .metadata .label {
+      color: #444;
+      text-transform: uppercase;
+      font-size: 0.9em;
+      letter-spacing: 0.1em;
+    }
+
+    .metadata .value {
+      color: #888;
+      margin-bottom: 10px;
+    }
+
+    .round-nav {
+      font-size: 0.7em;
       margin-bottom: 15px;
     }
 
-    #controls input[type="range"] {
-      background: transparent;
-    }
-
-    #controls button {
-      width: 100%;
-      padding: 8px;
-      background: transparent;
-      border: 1px solid #333;
-      color: #999;
-      border-radius: 3px;
-      font-size: 0.75em;
-      font-family: 'Courier New', monospace;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
+    .round-item {
+      padding: 8px 0;
+      border-bottom: 1px solid #1a1a1a;
       cursor: pointer;
-      transition: all 0.2s;
-      margin-bottom: 8px;
+      transition: color 0.2s;
     }
 
-    #controls button:hover {
-      border-color: #666;
-      color: #ccc;
+    .round-item:hover {
+      color: #999;
     }
 
-    #controls button:disabled {
-      opacity: 0.3;
-      cursor: not-allowed;
-    }
-
-    .speed-display {
-      font-size: 0.75em;
-      opacity: 0.5;
-      margin-bottom: 15px;
-    }
-
-    #timeline {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      height: 150px;
-      background: rgba(10, 10, 10, 0.95);
-      border-top: 1px solid #333;
-      z-index: 100;
-    }
-
-    #timeline canvas {
-      width: 100%;
-      height: 100%;
-    }
-
-    #event-info {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      z-index: 100;
-      background: rgba(10, 10, 10, 0.95);
-      padding: 20px;
-      border-radius: 3px;
-      border: 1px solid #333;
-      max-width: 400px;
-      font-size: 0.75em;
-      line-height: 1.6;
-      letter-spacing: 0.05em;
-    }
-
-    #event-info .label {
-      color: #666;
+    .round-item .round-label {
+      color: #444;
       text-transform: uppercase;
-      font-size: 0.85em;
-      margin-top: 10px;
-      margin-bottom: 3px;
+      font-size: 0.9em;
+      letter-spacing: 0.1em;
     }
 
-    #event-info .label:first-child {
-      margin-top: 0;
+    .round-item .round-strategy {
+      color: #666;
+      margin-top: 3px;
+      font-size: 0.95em;
     }
 
-    #event-info .value {
-      color: #ccc;
+    #canvas-container {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+      background: #0a0a0a;
+    }
+
+    #main-canvas {
+      display: block;
+      image-rendering: crisp-edges;
     }
 
     .legend {
       position: fixed;
-      bottom: 170px;
+      bottom: 20px;
       right: 20px;
-      z-index: 100;
       background: rgba(10, 10, 10, 0.95);
+      border: 1px solid #222;
       padding: 15px;
-      border-radius: 3px;
-      border: 1px solid #333;
-      font-size: 0.7em;
+      font-size: 0.65em;
       letter-spacing: 0.05em;
+    }
+
+    .legend-title {
+      color: #444;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      letter-spacing: 0.15em;
     }
 
     .legend-item {
       display: flex;
       align-items: center;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
+      color: #666;
     }
 
     .legend-item:last-child {
       margin-bottom: 0;
     }
 
-    .legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
+    .legend-color {
+      width: 12px;
+      height: 12px;
       margin-right: 8px;
+      border: 1px solid #333;
+    }
+
+    .loading {
+      color: #444;
+      text-align: center;
+      padding: 40px;
+      font-size: 0.75em;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
     }
 
     .hidden {
-      display: none !important;
+      display: none;
     }
   </style>
 </head>
 <body>
-  <div id="controls">
-    <h2>Fossil Record</h2>
-    <label for="file-input">Load Replay:</label>
-    <input type="file" id="file-input" accept=".json">
+  <div id="container">
+    <div id="sidebar">
+      <h1>Stratigraphy</h1>
 
-    <label for="speed">Playback Speed:</label>
-    <input type="range" id="speed" min="1" max="20" step="1" value="5">
-    <div class="speed-display">Speed: <span id="speed-value">5</span>x</div>
+      <input type="file" id="file-input" accept=".json">
 
-    <button id="play-pause" disabled>Play</button>
-    <button id="restart" disabled>Restart</button>
-  </div>
+      <div id="metadata" class="metadata hidden">
+        <div class="label">Performance</div>
+        <div class="value" id="perf-name">-</div>
 
-  <div id="event-info" class="hidden">
-    <div class="label">Round</div>
-    <div class="value" id="info-round">-</div>
+        <div class="label">Duration</div>
+        <div class="value" id="perf-duration">-</div>
 
-    <div class="label">Strategy</div>
-    <div class="value" id="info-strategy">-</div>
+        <div class="label">Participants</div>
+        <div class="value" id="perf-participants">-</div>
 
-    <div class="label">Current Event</div>
-    <div class="value" id="info-event">-</div>
+        <div class="label">Events</div>
+        <div class="value" id="perf-events">-</div>
+      </div>
 
-    <div class="label">Progress</div>
-    <div class="value" id="info-progress">-</div>
+      <div id="round-nav" class="hidden"></div>
+    </div>
+
+    <div id="canvas-container">
+      <div class="loading" id="loading">Load replay file to begin analysis</div>
+      <canvas id="main-canvas" class="hidden"></canvas>
+    </div>
   </div>
 
   <div class="legend hidden" id="legend">
+    <div class="legend-title">Artifacts</div>
     <div class="legend-item">
-      <div class="legend-dot" style="background: #444;"></div>
-      <div>Idle</div>
+      <div class="legend-color" style="background: #1a4d4d;"></div>
+      <div>Instruction (selection)</div>
     </div>
     <div class="legend-item">
-      <div class="legend-dot" style="background: #66ffd1; box-shadow: 0 0 8px #66ffd1;"></div>
-      <div>Selected</div>
+      <div class="legend-color" style="background: #9effc7;"></div>
+      <div>Fast completion (&lt;2s)</div>
     </div>
     <div class="legend-item">
-      <div class="legend-dot" style="background: #ffd166; box-shadow: 0 0 8px #ffd166;"></div>
-      <div>Working</div>
+      <div class="legend-color" style="background: #66aa88;"></div>
+      <div>Medium completion (2-5s)</div>
     </div>
     <div class="legend-item">
-      <div class="legend-dot" style="background: #9effc7; box-shadow: 0 0 8px #9effc7;"></div>
-      <div>Fast Complete</div>
+      <div class="legend-color" style="background: #444444;"></div>
+      <div>Slow completion (&gt;5s)</div>
     </div>
     <div class="legend-item">
-      <div class="legend-dot" style="background: #888; box-shadow: 0 0 8px #888;"></div>
-      <div>Slow Complete</div>
+      <div class="legend-color" style="background: #2a2a2a; border-color: #444;"></div>
+      <div>Round boundary</div>
     </div>
   </div>
 
-  <div id="timeline" class="hidden"></div>
-
   <script>
-    // Data
     let replayData = null;
-    let currentEventIndex = 0;
-    let playbackSpeed = 5;
-    let isPlaying = false;
-    let lastEventTime = 0;
-
-    // Visualization
-    let agent;
-    let participants = new Map();
-    let instructionBeams = [];
-    let completionFlows = [];
-
-    // Current round tracking
-    let currentRound = 0;
-    let currentStrategy = '';
-
-    // Particle states
-    const STATE_IDLE = 'idle';
-    const STATE_SELECTED = 'selected';
-    const STATE_WORKING = 'working';
-    const STATE_COMPLETED = 'completed';
-
-    // Agent (central node)
-    class Agent {
-      constructor(x, y) {
-        this.x = x;
-        this.y = y;
-        this.size = 40;
-        this.pulse = 0;
-        this.glow = 0;
-        this.targetGlow = 20;
-      }
-
-      update() {
-        this.pulse += 0.03;
-        this.glow = lerp(this.glow, this.targetGlow, 0.1);
-      }
-
-      draw() {
-        push();
-
-        // Glow
-        for (let i = 4; i > 0; i--) {
-          noStroke();
-          fill(102, 255, 209, this.glow * (i / 4));
-          circle(this.x, this.y, this.size + (i * 10) + sin(this.pulse) * 5);
-        }
-
-        // Core
-        fill(30, 30, 30);
-        stroke(102, 255, 209);
-        strokeWeight(2);
-        circle(this.x, this.y, this.size);
-
-        // Inner ring
-        noFill();
-        stroke(102, 255, 209, 150);
-        strokeWeight(1);
-        circle(this.x, this.y, this.size * 0.6 + sin(this.pulse * 2) * 3);
-
-        pop();
-      }
-
-      flash() {
-        this.targetGlow = 40;
-        setTimeout(() => { this.targetGlow = 20; }, 300);
-      }
-    }
-
-    // Participant node
-    class Participant {
-      constructor(id, index, total) {
-        this.id = id;
-        this.angle = (index / total) * TWO_PI;
-        this.distance = 250;
-        this.size = 6;
-        this.state = STATE_IDLE;
-        this.color = color(68, 68, 68);
-        this.targetColor = this.color;
-        this.glow = 0;
-        this.targetGlow = 0;
-        this.completionTime = 0;
-      }
-
-      setState(newState, completionTime = 0) {
-        this.state = newState;
-        this.completionTime = completionTime;
-
-        switch(newState) {
-          case STATE_IDLE:
-            this.targetColor = color(68, 68, 68);
-            this.targetGlow = 0;
-            break;
-          case STATE_SELECTED:
-            this.targetColor = color(102, 255, 209);
-            this.targetGlow = 30;
-            break;
-          case STATE_WORKING:
-            this.targetColor = color(255, 209, 102);
-            this.targetGlow = 20;
-            break;
-          case STATE_COMPLETED:
-            // Fast completions are bright green, slow are gray
-            if (completionTime < 2000) {
-              this.targetColor = color(158, 255, 199);
-              this.targetGlow = 40;
-            } else if (completionTime < 5000) {
-              this.targetColor = color(158, 255, 199);
-              this.targetGlow = 25;
-            } else {
-              this.targetColor = color(136, 136, 136);
-              this.targetGlow = 15;
-            }
-            // Fade back to idle after showing completion
-            setTimeout(() => {
-              if (this.state === STATE_COMPLETED) {
-                this.setState(STATE_IDLE);
-              }
-            }, 2000);
-            break;
-        }
-      }
-
-      update() {
-        this.color = lerpColor(this.color, this.targetColor, 0.1);
-        this.glow = lerp(this.glow, this.targetGlow, 0.1);
-        this.angle += 0.0005;
-      }
-
-      draw() {
-        const x = width / 2 + cos(this.angle) * this.distance;
-        const y = height / 2 + sin(this.angle) * this.distance;
-
-        push();
-
-        // Glow
-        if (this.glow > 1) {
-          for (let i = 3; i > 0; i--) {
-            noStroke();
-            fill(red(this.color), green(this.color), blue(this.color), this.glow * (i / 3));
-            circle(x, y, this.size + (i * 4));
-          }
-        }
-
-        // Particle
-        fill(this.color);
-        noStroke();
-        circle(x, y, this.size);
-
-        pop();
-      }
-
-      getPosition() {
-        return {
-          x: width / 2 + cos(this.angle) * this.distance,
-          y: height / 2 + sin(this.angle) * this.distance
-        };
-      }
-    }
-
-    // Instruction beam (agent → participant)
-    class InstructionBeam {
-      constructor(fromPos, toPos, groupColor) {
-        this.from = fromPos;
-        this.to = toPos;
-        this.progress = 0;
-        this.alpha = 0;
-        this.targetAlpha = 150;
-        this.color = groupColor;
-      }
-
-      update() {
-        this.progress = min(this.progress + 0.05, 1);
-        this.alpha = lerp(this.alpha, this.targetAlpha, 0.1);
-
-        if (this.progress >= 1) {
-          this.targetAlpha = 0;
-        }
-      }
-
-      draw() {
-        if (this.alpha < 1) return;
-
-        const currentX = lerp(this.from.x, this.to.x, this.progress);
-        const currentY = lerp(this.from.y, this.to.y, this.progress);
-
-        push();
-
-        // Beam trail
-        stroke(red(this.color), green(this.color), blue(this.color), this.alpha * 0.3);
-        strokeWeight(1);
-        line(this.from.x, this.from.y, currentX, currentY);
-
-        // Beam head
-        fill(red(this.color), green(this.color), blue(this.color), this.alpha);
-        noStroke();
-        circle(currentX, currentY, 4);
-
-        pop();
-      }
-
-      isDead() {
-        return this.progress >= 1 && this.alpha < 1;
-      }
-    }
-
-    // Completion flow (participant → agent)
-    class CompletionFlow {
-      constructor(fromPos, toPos, fast = true) {
-        this.from = fromPos;
-        this.to = toPos;
-        this.progress = 0;
-        this.alpha = 255;
-        this.fast = fast;
-        this.color = fast ? color(158, 255, 199) : color(136, 136, 136);
-      }
-
-      update() {
-        this.progress = min(this.progress + 0.08, 1);
-        if (this.progress >= 0.8) {
-          this.alpha = map(this.progress, 0.8, 1, 255, 0);
-        }
-      }
-
-      draw() {
-        if (this.progress >= 1) return;
-
-        const currentX = lerp(this.from.x, this.to.x, this.progress);
-        const currentY = lerp(this.from.y, this.to.y, this.progress);
-
-        push();
-
-        // Flow particle
-        fill(red(this.color), green(this.color), blue(this.color), this.alpha);
-        noStroke();
-        circle(currentX, currentY, 3);
-
-        // Trail
-        stroke(red(this.color), green(this.color), blue(this.color), this.alpha * 0.3);
-        strokeWeight(1);
-        const trailLength = 20;
-        const trailX = lerp(this.from.x, this.to.x, max(0, this.progress - 0.1));
-        const trailY = lerp(this.from.y, this.to.y, max(0, this.progress - 0.1));
-        line(trailX, trailY, currentX, currentY);
-
-        pop();
-      }
-
-      isDead() {
-        return this.progress >= 1;
-      }
-    }
-
-    // p5.js setup
-    function setup() {
-      createCanvas(windowWidth, windowHeight - 150);
-      agent = new Agent(width / 2, height / 2);
-    }
-
-    // p5.js draw
-    function draw() {
-      background(10, 10, 10);
-
-      // Draw agent
-      if (agent) {
-        agent.update();
-        agent.draw();
-      }
-
-      // Draw participants
-      for (let p of participants.values()) {
-        p.update();
-        p.draw();
-      }
-
-      // Draw instruction beams
-      instructionBeams = instructionBeams.filter(b => !b.isDead());
-      for (let beam of instructionBeams) {
-        beam.update();
-        beam.draw();
-      }
-
-      // Draw completion flows
-      completionFlows = completionFlows.filter(f => !f.isDead());
-      for (let flow of completionFlows) {
-        flow.update();
-        flow.draw();
-      }
-
-      // Process events
-      if (replayData && isPlaying) {
-        processEvents();
-      }
-    }
-
-    // Process events with timing
-    function processEvents() {
-      if (currentEventIndex >= replayData.events.length) {
-        isPlaying = false;
-        document.getElementById('play-pause').textContent = 'Play';
-        return;
-      }
-
-      const now = millis();
-      const event = replayData.events[currentEventIndex];
-
-      // Calculate delay
-      if (currentEventIndex > 0) {
-        const prevEvent = replayData.events[currentEventIndex - 1];
-        const eventDelay = (new Date(event.timestamp) - new Date(prevEvent.timestamp));
-        const scaledDelay = eventDelay / playbackSpeed;
-
-        if (now - lastEventTime < scaledDelay) {
-          return;
-        }
-      }
-
-      // Process event
-      handleEvent(event);
-
-      // Next event
-      currentEventIndex++;
-      lastEventTime = now;
-
-      // Update UI
-      updateProgress();
-    }
-
-    // Handle events
-    function handleEvent(event) {
-      console.log('Event:', event.type);
-
-      switch (event.type) {
-        case 'participant_join':
-          handleParticipantJoin(event);
-          break;
-        case 'round_start':
-          handleRoundStart(event);
-          break;
-        case 'instruction_sent':
-          handleInstructionSent(event);
-          break;
-        case 'task_completed':
-          handleTaskCompleted(event);
-          break;
-        case 'round_end':
-          handleRoundEnd(event);
-          break;
-      }
-
-      updateEventInfo(event);
-    }
-
-    function handleParticipantJoin(event) {
-      const id = event.participant_id;
-      const index = participants.size;
-      const total = Math.max(50, participants.size + 1); // Estimate total
-
-      const p = new Participant(id, index, total);
-      participants.set(id, p);
-    }
-
-    function handleRoundStart(event) {
-      currentRound = event.round_number;
-      currentStrategy = event.data.strategy || '';
-
-      // Reset all participants to idle
-      for (let p of participants.values()) {
-        p.setState(STATE_IDLE);
-      }
-
-      agent.flash();
-    }
-
-    function handleInstructionSent(event) {
-      const groupParticipants = event.data.participants || [];
-      const groupColor = color(102, 255, 209);
-
-      agent.flash();
-
-      // Create beams to selected participants
-      groupParticipants.forEach(pid => {
-        let p = participants.get(pid);
-
-        // Create participant if doesn't exist
-        if (!p) {
-          const index = participants.size;
-          const total = Math.max(50, participants.size + 1);
-          p = new Participant(pid, index, total);
-          participants.set(pid, p);
-        }
-
-        // Set state and create beam
-        p.setState(STATE_SELECTED);
-
-        const beam = new InstructionBeam(
-          { x: agent.x, y: agent.y },
-          p.getPosition(),
-          groupColor
-        );
-        instructionBeams.push(beam);
-
-        // Transition to working after beam arrives
-        setTimeout(() => {
-          if (p.state === STATE_SELECTED) {
-            p.setState(STATE_WORKING);
-          }
-        }, 1000);
-      });
-    }
-
-    function handleTaskCompleted(event) {
-      const pid = event.participant_id;
-      const completionTime = event.data.completion_time_ms;
-
-      const p = participants.get(pid);
-      if (p) {
-        p.setState(STATE_COMPLETED, completionTime);
-
-        // Create flow back to agent
-        const flow = new CompletionFlow(
-          p.getPosition(),
-          { x: agent.x, y: agent.y },
-          completionTime < 3000
-        );
-        completionFlows.push(flow);
-      }
-    }
-
-    function handleRoundEnd(event) {
-      // Keep participants in their current states
-      // They'll reset on next round start
-    }
-
-    function updateEventInfo(event) {
-      document.getElementById('info-round').textContent = currentRound;
-      document.getElementById('info-strategy').textContent = currentStrategy;
-      document.getElementById('info-event').textContent = event.type.replace('_', ' ');
-    }
-
-    function updateProgress() {
-      const progress = Math.round((currentEventIndex / replayData.events.length) * 100);
-      document.getElementById('info-progress').textContent =
-        `${currentEventIndex} / ${replayData.events.length} (${progress}%)`;
-    }
+    let canvas = null;
+    let ctx = null;
+
+    // Analysis data
+    let participantIds = [];
+    let rounds = [];
+    let startTime = null;
+    let endTime = null;
+    let totalDuration = 0;
+
+    // Visual constants
+    const PARTICIPANT_WIDTH = 4;
+    const TIME_SCALE = 0.05; // pixels per millisecond
+    const ROUND_SEPARATOR_HEIGHT = 40;
+    const MARGIN = 60;
 
     // Load file
     document.getElementById('file-input').addEventListener('change', function(e) {
@@ -682,7 +236,8 @@
       reader.onload = function(e) {
         try {
           replayData = JSON.parse(e.target.result);
-          initializeReplay();
+          analyzeData();
+          renderVisualization();
         } catch (error) {
           console.error('Error loading replay:', error);
           alert('Error loading replay file');
@@ -691,57 +246,250 @@
       reader.readAsText(file);
     });
 
-    function initializeReplay() {
-      console.log('Loaded replay:', replayData.performance_id);
+    function analyzeData() {
+      console.log('Analyzing data...');
 
-      // Reset
-      participants.clear();
-      instructionBeams = [];
-      completionFlows = [];
-      currentEventIndex = 0;
-      currentRound = 0;
-      currentStrategy = '';
-      isPlaying = false;
-      lastEventTime = millis();
+      // Extract timeline
+      startTime = new Date(replayData.metadata.start_time);
+      endTime = new Date(replayData.metadata.end_time);
+      totalDuration = endTime - startTime;
 
-      // Enable controls
-      document.getElementById('play-pause').disabled = false;
-      document.getElementById('restart').disabled = false;
-      document.getElementById('event-info').classList.remove('hidden');
-      document.getElementById('legend').classList.remove('hidden');
-      document.getElementById('timeline').classList.remove('hidden');
+      // Collect all unique participants from events
+      const participantSet = new Set();
+      replayData.events.forEach(event => {
+        if (event.participant_id) {
+          participantSet.add(event.participant_id);
+        }
+        if (event.data && event.data.participants) {
+          event.data.participants.forEach(id => participantSet.add(id));
+        }
+      });
+      participantIds = Array.from(participantSet).sort();
 
-      updateProgress();
+      // Organize events by round
+      rounds = [];
+      let currentRound = null;
+
+      replayData.events.forEach(event => {
+        const eventTime = new Date(event.timestamp);
+        const relativeTime = eventTime - startTime;
+
+        if (event.type === 'round_start') {
+          currentRound = {
+            number: event.round_number,
+            strategy: event.data.strategy || '',
+            observation: event.data.observation || '',
+            narrative: event.data.narrative_thread || '',
+            startTime: relativeTime,
+            endTime: null,
+            instructions: [],
+            completions: [],
+            reflection: '',
+            sentiment: ''
+          };
+          rounds.push(currentRound);
+        }
+
+        if (event.type === 'instruction_sent' && currentRound) {
+          currentRound.instructions.push({
+            time: relativeTime,
+            participants: event.data.participants || [],
+            task: event.data.task || ''
+          });
+        }
+
+        if (event.type === 'task_completed' && currentRound) {
+          currentRound.completions.push({
+            time: relativeTime,
+            participantId: event.participant_id,
+            completionTime: event.data.completion_time_ms
+          });
+        }
+
+        if (event.type === 'round_end' && currentRound) {
+          currentRound.endTime = relativeTime;
+          currentRound.reflection = event.data.reflection || '';
+          currentRound.sentiment = event.data.sentiment || '';
+        }
+      });
+
+      // Fix any rounds without end times
+      rounds.forEach((round, i) => {
+        if (round.endTime === null) {
+          if (i < rounds.length - 1) {
+            round.endTime = rounds[i + 1].startTime;
+          } else {
+            round.endTime = totalDuration;
+          }
+        }
+      });
+
+      console.log('Analysis complete:', {
+        participants: participantIds.length,
+        rounds: rounds.length,
+        duration: totalDuration
+      });
+
+      // Update metadata
+      document.getElementById('perf-name').textContent = replayData.metadata.name;
+      document.getElementById('perf-duration').textContent =
+        `${(totalDuration / 1000).toFixed(1)}s`;
+      document.getElementById('perf-participants').textContent = participantIds.length;
+      document.getElementById('perf-events').textContent = replayData.events.length;
+      document.getElementById('metadata').classList.remove('hidden');
+
+      // Build round navigation
+      const roundNav = document.getElementById('round-nav');
+      roundNav.innerHTML = '';
+      rounds.forEach((round, i) => {
+        const item = document.createElement('div');
+        item.className = 'round-item';
+        item.innerHTML = `
+          <div class="round-label">Round ${round.number}</div>
+          <div class="round-strategy">${round.strategy.substring(0, 60)}${round.strategy.length > 60 ? '...' : ''}</div>
+        `;
+        item.onclick = () => scrollToRound(i);
+        roundNav.appendChild(item);
+      });
+      document.getElementById('round-nav').classList.remove('hidden');
     }
 
-    // Controls
-    document.getElementById('speed').addEventListener('input', function(e) {
-      playbackSpeed = parseInt(e.target.value);
-      document.getElementById('speed-value').textContent = playbackSpeed;
-    });
+    function renderVisualization() {
+      console.log('Rendering visualization...');
 
-    document.getElementById('play-pause').addEventListener('click', function() {
-      if (!replayData) return;
-      isPlaying = !isPlaying;
-      this.textContent = isPlaying ? 'Pause' : 'Play';
-      if (isPlaying) {
-        lastEventTime = millis();
-      }
-    });
+      // Calculate dimensions
+      const canvasWidth = MARGIN * 2 + participantIds.length * PARTICIPANT_WIDTH;
+      const totalHeight = rounds.reduce((sum, round) => {
+        return sum + (round.endTime - round.startTime) * TIME_SCALE + ROUND_SEPARATOR_HEIGHT;
+      }, 0);
+      const canvasHeight = MARGIN * 2 + totalHeight;
 
-    document.getElementById('restart').addEventListener('click', function() {
-      if (replayData) {
-        initializeReplay();
-      }
-    });
+      // Setup canvas
+      canvas = document.getElementById('main-canvas');
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+      ctx = canvas.getContext('2d');
 
-    // Window resize
-    function windowResized() {
-      resizeCanvas(windowWidth, windowHeight - 150);
-      if (agent) {
-        agent.x = width / 2;
-        agent.y = height / 2;
+      // Clear
+      ctx.fillStyle = '#0a0a0a';
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
+
+      // Draw visualization
+      let currentY = MARGIN;
+
+      rounds.forEach((round, roundIndex) => {
+        const roundDuration = round.endTime - round.startTime;
+        const roundHeight = roundDuration * TIME_SCALE;
+
+        // Round separator bar
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillRect(0, currentY, canvasWidth, ROUND_SEPARATOR_HEIGHT);
+
+        // Round label
+        ctx.fillStyle = '#666';
+        ctx.font = '10px Courier New';
+        ctx.fillText(
+          `ROUND ${round.number}`,
+          10,
+          currentY + 15
+        );
+
+        // Strategy (truncated)
+        ctx.fillStyle = '#444';
+        ctx.font = '9px Courier New';
+        const strategyText = round.strategy.substring(0, 80);
+        ctx.fillText(strategyText, 10, currentY + 30);
+
+        currentY += ROUND_SEPARATOR_HEIGHT;
+
+        // Draw round background
+        ctx.fillStyle = roundIndex % 2 === 0 ? '#0d0d0d' : '#0a0a0a';
+        ctx.fillRect(0, currentY, canvasWidth, roundHeight);
+
+        // Draw instructions as horizontal bands
+        round.instructions.forEach(instruction => {
+          const instructionY = currentY + (instruction.time - round.startTime) * TIME_SCALE;
+
+          instruction.participants.forEach(participantId => {
+            const participantIndex = participantIds.indexOf(participantId);
+            if (participantIndex === -1) return;
+
+            const x = MARGIN + participantIndex * PARTICIPANT_WIDTH;
+
+            // Instruction mark
+            ctx.fillStyle = '#1a4d4d';
+            ctx.fillRect(x, instructionY, PARTICIPANT_WIDTH, 3);
+          });
+        });
+
+        // Draw completions as dots
+        round.completions.forEach(completion => {
+          const completionY = currentY + (completion.time - round.startTime) * TIME_SCALE;
+          const participantIndex = participantIds.indexOf(completion.participantId);
+          if (participantIndex === -1) return;
+
+          const x = MARGIN + participantIndex * PARTICIPANT_WIDTH + PARTICIPANT_WIDTH / 2;
+
+          // Color by speed
+          let color;
+          if (completion.completionTime < 2000) {
+            color = '#9effc7'; // Fast
+          } else if (completion.completionTime < 5000) {
+            color = '#66aa88'; // Medium
+          } else {
+            color = '#444444'; // Slow
+          }
+
+          ctx.fillStyle = color;
+          ctx.fillRect(x - 1, completionY, 2, 2);
+        });
+
+        // Draw reflection at bottom of round
+        if (round.reflection) {
+          const reflectionY = currentY + roundHeight - 15;
+          ctx.fillStyle = '#333';
+          ctx.font = '8px Courier New';
+          const reflectionText = `"${round.reflection.substring(0, 100)}${round.reflection.length > 100 ? '...' : ''}"`;
+          ctx.fillText(reflectionText, 10, reflectionY);
+        }
+
+        currentY += roundHeight;
+      });
+
+      // Draw participant axis labels (vertical on left)
+      ctx.fillStyle = '#333';
+      ctx.font = '8px Courier New';
+      ctx.save();
+      ctx.translate(15, MARGIN + 50);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText('PARTICIPANTS →', 0, 0);
+      ctx.restore();
+
+      // Draw time axis label
+      ctx.fillStyle = '#333';
+      ctx.fillText('TIME ↓', canvasWidth - 80, MARGIN - 10);
+
+      // Show canvas
+      document.getElementById('loading').classList.add('hidden');
+      canvas.classList.remove('hidden');
+      document.getElementById('legend').classList.remove('hidden');
+
+      console.log('Visualization complete');
+    }
+
+    function scrollToRound(roundIndex) {
+      if (!canvas) return;
+
+      // Calculate Y position of round
+      let targetY = MARGIN;
+      for (let i = 0; i < roundIndex; i++) {
+        const roundDuration = rounds[i].endTime - rounds[i].startTime;
+        targetY += roundDuration * TIME_SCALE + ROUND_SEPARATOR_HEIGHT;
       }
+
+      // Scroll to position
+      const container = document.getElementById('canvas-container');
+      container.scrollTop = targetY - 100;
     }
   </script>
 </body>
