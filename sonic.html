@@ -179,11 +179,17 @@
       <div>• Mapped to pentatonic scale across 3 octaves</div>
       <div>• Instruction = note attack / Completion = pitch bend + release</div>
       <div>• Stereo panning by participant position</div>
-      <div><strong>Sonic Scaffolding:</strong></div>
-      <div>• Bass drone follows harmonic root per round</div>
-      <div>• Ambient pad provides harmonic fifth</div>
-      <div>• Pulse click marks each instruction</div>
-      <div>• Round changes shift harmony (I-IV-V-II-VI)</div>
+      <div><strong>Data-Derived Harmony:</strong></div>
+      <div>• Bass/pad roots derived from completion time patterns</div>
+      <div>• Fast avg times → higher/brighter harmony</div>
+      <div>• Slow avg times → lower/darker harmony</div>
+      <div>• High variance → minor intervals, more bass</div>
+      <div>• Low variance → major intervals, more pad</div>
+      <div><strong>Group Voicing:</strong></div>
+      <div>• Large groups (>5) = major third harmonics</div>
+      <div>• Medium groups (3-5) = perfect fifth harmonics</div>
+      <div>• Small groups = subtle detuning</div>
+      <div>• Groups >8 participants = arpeggiated attack</div>
     </div>
   </div>
 
@@ -307,32 +313,67 @@
       pulseOsc.start();
     }
 
-    function setRoundHarmony(roundNumber) {
+    function analyzeRoundHarmony(roundEvents) {
+      // Analyze completion time patterns to find harmonic character
+      const completions = roundEvents.filter(e => e.type === 'task_completed');
+
+      if (completions.length === 0) return { root: 0, mode: 'major' };
+
+      // Calculate completion time statistics
+      const times = completions.map(c => c.data.completion_time_ms);
+      const avgTime = times.reduce((a, b) => a + b, 0) / times.length;
+      const variance = times.reduce((sum, t) => sum + Math.pow(t - avgTime, 2), 0) / times.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Fast average = brighter harmony (higher in scale)
+      // Slow average = darker harmony (lower in scale)
+      // High variance = more complex/dissonant intervals
+
+      const timeNormalized = Math.min(avgTime / 5000, 1); // 0-1, where 1 is slow
+      const varianceNormalized = Math.min(stdDev / 2000, 1); // 0-1, where 1 is high variance
+
+      // Map average time to scale position (fast = higher, slow = lower)
+      const scalePosition = Math.floor((1 - timeNormalized) * pentatonicScale.length);
+      const root = pentatonicScale[scalePosition];
+
+      // High variance suggests minor/modal quality, low variance suggests major
+      const mode = varianceNormalized > 0.5 ? 'minor' : 'major';
+
+      return { root, mode, variance: varianceNormalized };
+    }
+
+    function setRoundHarmony(roundNumber, roundData) {
       if (!audioContext || !bassDrone || !ambientPad) return;
 
       try {
-        const chordIndex = roundNumber % chordRoots.length;
-        const rootSemitone = chordRoots[chordIndex];
+        // Analyze the round's events to derive harmony
+        const harmony = analyzeRoundHarmony(roundData.events);
 
-        // Bass drone follows root
-        const bassFreq = 65.41 * Math.pow(2, rootSemitone / 12); // C2 + semitones
+        // Bass drone follows derived root
+        const bassFreq = 65.41 * Math.pow(2, harmony.root / 12); // C2 + semitones
 
         const now = audioContext.currentTime;
         bassDrone.frequency.exponentialRampToValueAtTime(bassFreq, now + 2);
 
-        // Ambient pad is a fifth above
-        const padFreq = bassFreq * 1.5; // Perfect fifth
+        // Ambient pad interval depends on mode
+        // Major = perfect fifth (1.5x), minor = minor sixth (1.587x)
+        const intervalMultiplier = harmony.mode === 'major' ? 1.5 : 1.587;
+        const padFreq = bassFreq * intervalMultiplier;
         ambientPad.frequency.exponentialRampToValueAtTime(padFreq, now + 2);
 
-        // Fade in bass drone
+        // Bass drone intensity based on variance (more variance = stronger bass foundation)
+        const droneGain = 0.05 + (harmony.variance * 0.05);
         bassDroneGain.gain.cancelScheduledValues(now);
         bassDroneGain.gain.setValueAtTime(bassDroneGain.gain.value, now);
-        bassDroneGain.gain.linearRampToValueAtTime(0.08, now + 1);
+        bassDroneGain.gain.linearRampToValueAtTime(droneGain, now + 1);
 
-        // Subtle ambient pad
+        // Pad gain inversely related to variance (consonant = more pad)
+        const padGain = 0.03 - (harmony.variance * 0.015);
         ambientPadGain.gain.cancelScheduledValues(now);
         ambientPadGain.gain.setValueAtTime(ambientPadGain.gain.value, now);
-        ambientPadGain.gain.linearRampToValueAtTime(0.02, now + 1.5);
+        ambientPadGain.gain.linearRampToValueAtTime(padGain, now + 1.5);
+
+        console.log(`Round ${roundNumber}: Root=${harmony.root}, Mode=${harmony.mode}, Variance=${harmony.variance.toFixed(2)}`);
       } catch (error) {
         console.error('Error setting round harmony:', error);
       }
@@ -589,8 +630,27 @@
         participantToIndex.set(id, index);
       });
 
-      // Track current round for harmony changes
-      let currentRound = -1;
+      // Organize events by round for harmonic analysis
+      const roundsData = [];
+      let currentRoundData = null;
+
+      replayData.events.forEach(event => {
+        if (event.type === 'round_start') {
+          if (currentRoundData) {
+            roundsData.push(currentRoundData);
+          }
+          currentRoundData = {
+            number: event.round_number || 0,
+            events: []
+          };
+        }
+        if (currentRoundData) {
+          currentRoundData.events.push(event);
+        }
+      });
+      if (currentRoundData) {
+        roundsData.push(currentRoundData);
+      }
 
       // Schedule all events
       replayData.events.forEach(event => {
@@ -599,14 +659,16 @@
 
         if (event.type === 'round_start') {
           const roundNumber = event.round_number || 0;
+          const roundData = roundsData.find(r => r.number === roundNumber);
           const timeoutId = setTimeout(() => {
-            setRoundHarmony(roundNumber);
+            setRoundHarmony(roundNumber, roundData);
           }, relativeTime);
           scheduledEvents.push(timeoutId);
         }
 
         if (event.type === 'instruction_sent') {
           const participants = event.data.participants || [];
+          const groupSize = participants.length;
 
           // Play pulse for instruction
           const pulseTimeoutId = setTimeout(() => {
@@ -614,14 +676,19 @@
           }, relativeTime);
           scheduledEvents.push(pulseTimeoutId);
 
-          participants.forEach(participantId => {
+          // Arpeggiate larger groups for harmonic clarity
+          const shouldArpeggiate = groupSize > 8;
+          const arpDelay = shouldArpeggiate ? 25 : 0; // milliseconds between notes
+
+          participants.forEach((participantId, idx) => {
             const participantIndex = participantToIndex.get(participantId);
             if (participantIndex === undefined) return;
 
-            // Schedule note-on
+            // Schedule note-on with optional arpeggio delay
+            const noteDelay = shouldArpeggiate ? (idx * arpDelay) : 0;
             const timeoutId = setTimeout(() => {
-              playNote(participantId, participantIndex, participantArray.length);
-            }, relativeTime);
+              playNote(participantId, participantIndex, participantArray.length, groupSize);
+            }, relativeTime + noteDelay);
 
             scheduledEvents.push(timeoutId);
           });
@@ -680,21 +747,19 @@
       scheduledEvents.push(completionTimeout);
     }
 
-    function playNote(participantId, participantIndex, totalParticipants) {
+    function playNote(participantId, participantIndex, totalParticipants, groupSize = 1) {
       if (!isPlaying || !audioContext) return;
 
       try {
         // If a note is already playing for this participant, let it finish naturally
-        // This prevents cutting off sounds prematurely
         const existing = activeOscillators.get(participantId);
         if (existing) {
-          // Don't interrupt - the completion will handle stopping
           console.log(`Note already playing for ${participantId}, skipping duplicate`);
           return;
         }
 
         // Quantize to pentatonic scale
-        const octaves = 3; // Spread across 3 octaves
+        const octaves = 3;
         const notesPerOctave = pentatonicScale.length;
         const totalNotes = octaves * notesPerOctave;
 
@@ -706,15 +771,38 @@
         const semitoneOffset = (octave * 12) + pentatonicScale[scaleIndex];
         const frequency = baseFreq * Math.pow(2, semitoneOffset / 12);
 
-        // Create oscillator with triangle wave (softer than sine)
-        const osc = audioContext.createOscillator();
-        osc.frequency.value = frequency;
-        osc.type = 'triangle';
+        // Create richer timbre for larger groups (chord voicings)
+        const osc1 = audioContext.createOscillator();
+        osc1.frequency.value = frequency;
+        osc1.type = 'triangle';
+
+        // Add harmonic richness for groups (second voice)
+        const osc2 = audioContext.createOscillator();
+        if (groupSize > 5) {
+          // Large groups get a third above (major third ~= 1.26)
+          osc2.frequency.value = frequency * 1.26;
+          osc2.type = 'triangle';
+        } else if (groupSize > 2) {
+          // Medium groups get a fifth above
+          osc2.frequency.value = frequency * 1.5;
+          osc2.type = 'sine';
+        } else {
+          // Small groups just get slight detuning for warmth
+          osc2.frequency.value = frequency * 1.005;
+          osc2.type = 'triangle';
+        }
+
+        const osc1Gain = audioContext.createGain();
+        const osc2Gain = audioContext.createGain();
+
+        // Balance between voices
+        osc1Gain.gain.value = 1.0;
+        osc2Gain.gain.value = groupSize > 2 ? 0.4 : 0.2; // More harmonics for larger groups
 
         // Create filter for warmer sound
         const filter = audioContext.createBiquadFilter();
         filter.type = 'lowpass';
-        filter.frequency.value = 2000;
+        filter.frequency.value = 2000 + (groupSize * 100); // Brighter for larger groups
         filter.Q.value = 1;
 
         // Create gain node with envelope
@@ -722,39 +810,49 @@
 
         // Stereo panning based on participant position
         const panner = audioContext.createStereoPanner();
-        panner.pan.value = (participantIndex / totalParticipants) * 2 - 1; // -1 to 1
+        panner.pan.value = (participantIndex / totalParticipants) * 2 - 1;
 
-        // ADSR Envelope
+        // ADSR Envelope - larger groups have longer attack
         const now = audioContext.currentTime;
-        const attackTime = 0.02;
+        const attackTime = 0.02 + (groupSize * 0.005);
         const decayTime = 0.1;
-        const sustainLevel = 0.015; // Quieter overall
+        const sustainLevel = 0.012 + (groupSize * 0.002); // Louder for larger groups
 
         gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(0.04, now + attackTime); // Attack
-        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime); // Decay to sustain
+        gainNode.gain.linearRampToValueAtTime(0.04, now + attackTime);
+        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime);
 
-        // Connect: osc → filter → gain → panner → master
-        osc.connect(filter);
+        // Connect: oscs → gains → filter → gain → panner → master
+        osc1.connect(osc1Gain);
+        osc2.connect(osc2Gain);
+        osc1Gain.connect(filter);
+        osc2Gain.connect(filter);
         filter.connect(gainNode);
         gainNode.connect(panner);
         panner.connect(masterGain);
 
-        osc.start(now);
+        osc1.start(now);
+        osc2.start(now);
 
         // Handle oscillator end event
-        osc.onended = () => {
+        osc1.onended = () => {
           activeOscillators.delete(participantId);
         };
 
-        activeOscillators.set(participantId, { osc, gainNode, filter, panner, frequency });
+        activeOscillators.set(participantId, {
+          osc: osc1,
+          osc2: osc2,
+          gainNode,
+          filter,
+          panner,
+          frequency
+        });
       } catch (error) {
         console.error('Error playing note:', error);
       }
     }
 
     function stopNote(participantId, completionTime) {
-      // Don't check isPlaying - notes should finish even if playback stopped
       if (!audioContext) return;
 
       const active = activeOscillators.get(participantId);
@@ -764,10 +862,9 @@
       }
 
       try {
-        const { osc, gainNode, frequency } = active;
+        const { osc, osc2, gainNode, frequency } = active;
 
         // Pitch shift based on completion speed
-        // Fast = pitch up, slow = pitch down
         let pitchMultiplier;
         if (completionTime < 2000) {
           pitchMultiplier = 1.5; // Fast - up a fifth
@@ -783,37 +880,53 @@
 
         // Cancel any scheduled changes
         osc.frequency.cancelScheduledValues(now);
+        if (osc2) {
+          osc2.frequency.cancelScheduledValues(now);
+        }
         gainNode.gain.cancelScheduledValues(now);
 
-        // Pitch bend
+        // Pitch bend both oscillators
         const currentFreq = osc.frequency.value;
         const targetFreq = currentFreq * pitchMultiplier;
         osc.frequency.setValueAtTime(currentFreq, now);
         osc.frequency.exponentialRampToValueAtTime(
-          Math.max(20, targetFreq), // Ensure frequency stays above 20Hz
+          Math.max(20, targetFreq),
           now + pitchBendTime
         );
 
-        // Release envelope (use linear for safe ramp to zero)
+        if (osc2) {
+          const currentFreq2 = osc2.frequency.value;
+          const targetFreq2 = currentFreq2 * pitchMultiplier;
+          osc2.frequency.setValueAtTime(currentFreq2, now);
+          osc2.frequency.exponentialRampToValueAtTime(
+            Math.max(20, targetFreq2),
+            now + pitchBendTime
+          );
+        }
+
+        // Release envelope
         const currentGain = gainNode.gain.value;
         gainNode.gain.setValueAtTime(currentGain, now);
         gainNode.gain.linearRampToValueAtTime(0, now + releaseTime);
 
-        // Stop oscillator after release completes
-        const stopTime = now + releaseTime + 0.05; // Small buffer
-        osc.onended = null; // Remove callback to prevent interference
+        // Stop oscillators after release completes
+        const stopTime = now + releaseTime + 0.05;
+        osc.onended = null;
         osc.stop(stopTime);
+        if (osc2) {
+          osc2.stop(stopTime);
+        }
 
         // Clean up from map after stopping
         setTimeout(() => {
           activeOscillators.delete(participantId);
         }, (releaseTime + 0.1) * 1000);
       } catch (error) {
-        // If anything fails, force cleanup
         console.error('Error stopping note:', error);
         try {
           active.osc.onended = null;
           active.osc.stop();
+          if (active.osc2) active.osc2.stop();
         } catch (e) {}
         activeOscillators.delete(participantId);
       }
