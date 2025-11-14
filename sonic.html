@@ -283,6 +283,14 @@
     function loadPerformance() {
       console.log('Loading performance for sonification...');
 
+      // Stop any existing playback and clean up
+      if (isPlaying) {
+        stopPlayback();
+      }
+
+      // Clear any lingering state
+      resetState();
+
       initAudio();
 
       // Extract info
@@ -300,12 +308,41 @@
       document.getElementById('info').classList.remove('hidden');
       document.getElementById('legend').classList.remove('hidden');
       document.getElementById('play-btn').disabled = false;
+      document.getElementById('stop-btn').disabled = true;
+      document.getElementById('progress-value').textContent = 'Ready';
 
       // Setup visualizer
       canvas = document.getElementById('visualizer');
       canvasCtx = canvas.getContext('2d');
       canvas.width = canvas.offsetWidth;
       canvas.height = canvas.offsetHeight;
+    }
+
+    function resetState() {
+      // Clear all scheduled events
+      scheduledEvents.forEach(id => clearTimeout(id));
+      scheduledEvents = [];
+
+      // Force stop all oscillators
+      activeOscillators.forEach((active, participantId) => {
+        try {
+          if (active.osc) {
+            active.osc.onended = null; // Remove callback to prevent issues
+            active.osc.stop();
+          }
+        } catch (e) {}
+      });
+      activeOscillators.clear();
+
+      // Stop visualization
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+
+      // Reset playback state
+      isPlaying = false;
+      startTime = null;
     }
 
     // Speed control
@@ -350,6 +387,12 @@
     });
 
     function stopPlayback() {
+      if (!isPlaying) {
+        // Even if not playing, ensure clean state
+        resetState();
+        return;
+      }
+
       isPlaying = false;
 
       // Cancel all scheduled events
@@ -363,10 +406,11 @@
           if (audioContext && active.gainNode) {
             active.gainNode.gain.cancelScheduledValues(now);
             active.gainNode.gain.setValueAtTime(active.gainNode.gain.value, now);
-            active.gainNode.gain.linearRampToValueAtTime(0, now + 0.05);
+            active.gainNode.gain.linearRampToValueAtTime(0, now + 0.1);
           }
           if (active.osc) {
-            active.osc.stop(now + 0.1);
+            active.osc.onended = null; // Remove callback
+            active.osc.stop(now + 0.15);
           }
         } catch (e) {
           console.error('Error stopping oscillator:', e);
@@ -379,6 +423,8 @@
         cancelAnimationFrame(animationId);
         animationId = null;
       }
+
+      startTime = null;
 
       document.getElementById('play-btn').disabled = false;
       document.getElementById('stop-btn').disabled = true;
@@ -440,8 +486,37 @@
       // Schedule completion
       const totalDuration = (new Date(replayData.metadata.end_time) - performanceStart) / playbackSpeed;
       const completionTimeout = setTimeout(() => {
-        stopPlayback();
-        document.getElementById('progress-value').textContent = 'Complete';
+        // Mark as not playing first
+        isPlaying = false;
+
+        // Let any remaining notes finish naturally (give 2 seconds)
+        setTimeout(() => {
+          // Clean up any lingering oscillators
+          activeOscillators.forEach((active, participantId) => {
+            try {
+              if (audioContext && active.gainNode) {
+                const now = audioContext.currentTime;
+                active.gainNode.gain.cancelScheduledValues(now);
+                active.gainNode.gain.setValueAtTime(active.gainNode.gain.value, now);
+                active.gainNode.gain.linearRampToValueAtTime(0, now + 0.5);
+              }
+              if (active.osc) {
+                active.osc.stop(audioContext.currentTime + 0.6);
+              }
+            } catch (e) {}
+          });
+          activeOscillators.clear();
+
+          // Stop visualization
+          if (animationId) {
+            cancelAnimationFrame(animationId);
+            animationId = null;
+          }
+
+          document.getElementById('play-btn').disabled = false;
+          document.getElementById('stop-btn').disabled = true;
+          document.getElementById('progress-value').textContent = 'Complete';
+        }, 2000);
       }, totalDuration);
       scheduledEvents.push(completionTimeout);
     }
@@ -450,15 +525,13 @@
       if (!isPlaying || !audioContext) return;
 
       try {
-        // Clean up any existing note for this participant
+        // If a note is already playing for this participant, let it finish naturally
+        // This prevents cutting off sounds prematurely
         const existing = activeOscillators.get(participantId);
         if (existing) {
-          try {
-            existing.gainNode.gain.cancelScheduledValues(audioContext.currentTime);
-            existing.gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-            existing.osc.stop(audioContext.currentTime);
-          } catch (e) {}
-          activeOscillators.delete(participantId);
+          // Don't interrupt - the completion will handle stopping
+          console.log(`Note already playing for ${participantId}, skipping duplicate`);
+          return;
         }
 
         // Quantize to pentatonic scale
@@ -522,10 +595,14 @@
     }
 
     function stopNote(participantId, completionTime) {
-      if (!isPlaying || !audioContext) return;
+      // Don't check isPlaying - notes should finish even if playback stopped
+      if (!audioContext) return;
 
       const active = activeOscillators.get(participantId);
-      if (!active) return;
+      if (!active) {
+        console.log(`No active note found for ${participantId}`);
+        return;
+      }
 
       try {
         const { osc, gainNode, frequency } = active;
@@ -565,9 +642,10 @@
 
         // Stop oscillator after release completes
         const stopTime = now + releaseTime + 0.05; // Small buffer
+        osc.onended = null; // Remove callback to prevent interference
         osc.stop(stopTime);
 
-        // Clean up from map (onended callback will also handle this)
+        // Clean up from map after stopping
         setTimeout(() => {
           activeOscillators.delete(participantId);
         }, (releaseTime + 0.1) * 1000);
@@ -575,6 +653,7 @@
         // If anything fails, force cleanup
         console.error('Error stopping note:', error);
         try {
+          active.osc.onended = null;
           active.osc.stop();
         } catch (e) {}
         activeOscillators.delete(participantId);
