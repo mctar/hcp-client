@@ -174,11 +174,12 @@
 
     <div id="legend" class="hidden">
       <div>SONIFICATION MAPPING:</div>
-      <div>• Each participant = voice (sine wave oscillator)</div>
-      <div>• Instruction = note attack (sound begins)</div>
-      <div>• Completion speed → pitch (fast = high, slow = low)</div>
-      <div>• Simultaneous completions = chords</div>
-      <div>• Patterns → rhythms and harmonies</div>
+      <div>• Each participant = voice (filtered triangle wave)</div>
+      <div>• Participants mapped to pentatonic scale (C major)</div>
+      <div>• Instruction = note attack with ADSR envelope</div>
+      <div>• Completion speed → pitch bend (fast up, slow down)</div>
+      <div>• Spatial positioning → stereo panning</div>
+      <div>• Signal chain: filter → reverb → compressor</div>
     </div>
   </div>
 
@@ -195,14 +196,63 @@
     let animationId = null;
     let startTime = null;
 
+    // Audio nodes
+    let masterGain = null;
+    let compressor = null;
+    let convolver = null;
+
+    // Musical scale (Pentatonic C major - more pleasant)
+    const pentatonicScale = [0, 2, 4, 7, 9]; // Scale degrees
+
     // Audio setup
     function initAudio() {
       if (!audioContext) {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Master gain (volume control)
+        masterGain = audioContext.createGain();
+        masterGain.gain.value = 0.3;
+
+        // Compressor (prevent clipping)
+        compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = -24;
+        compressor.knee.value = 30;
+        compressor.ratio.value = 12;
+        compressor.attack.value = 0.003;
+        compressor.release.value = 0.25;
+
+        // Analyser
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
+
+        // Create simple reverb
+        createReverb();
+
+        // Connect chain: masterGain → convolver → compressor → analyser → destination
+        masterGain.connect(convolver);
+        convolver.connect(compressor);
+        compressor.connect(analyser);
         analyser.connect(audioContext.destination);
       }
+    }
+
+    // Create simple reverb using convolver
+    function createReverb() {
+      convolver = audioContext.createConvolver();
+
+      // Create impulse response (simple reverb)
+      const sampleRate = audioContext.sampleRate;
+      const length = sampleRate * 2; // 2 second reverb
+      const impulse = audioContext.createBuffer(2, length, sampleRate);
+
+      for (let channel = 0; channel < 2; channel++) {
+        const channelData = impulse.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+          channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+        }
+      }
+
+      convolver.buffer = impulse;
     }
 
     // Load file
@@ -289,9 +339,9 @@
       scheduledEvents = [];
 
       // Stop all active oscillators
-      activeOscillators.forEach(osc => {
+      activeOscillators.forEach(active => {
         try {
-          osc.stop();
+          active.osc.stop();
         } catch (e) {}
       });
       activeOscillators.clear();
@@ -371,31 +421,56 @@
     function playNote(participantId, participantIndex, totalParticipants) {
       if (!isPlaying) return;
 
-      // Create oscillator
+      // Quantize to pentatonic scale
+      const octaves = 3; // Spread across 3 octaves
+      const notesPerOctave = pentatonicScale.length;
+      const totalNotes = octaves * notesPerOctave;
+
+      const noteIndex = Math.floor((participantIndex / totalParticipants) * totalNotes);
+      const octave = Math.floor(noteIndex / notesPerOctave);
+      const scaleIndex = noteIndex % notesPerOctave;
+
+      const baseFreq = 261.63; // C4
+      const semitoneOffset = (octave * 12) + pentatonicScale[scaleIndex];
+      const frequency = baseFreq * Math.pow(2, semitoneOffset / 12);
+
+      // Create oscillator with triangle wave (softer than sine)
       const osc = audioContext.createOscillator();
+      osc.frequency.value = frequency;
+      osc.type = 'triangle';
+
+      // Create filter for warmer sound
+      const filter = audioContext.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 2000;
+      filter.Q.value = 1;
+
+      // Create gain node with envelope
       const gainNode = audioContext.createGain();
 
-      // Calculate frequency based on participant index
-      // Spread across 2 octaves (C4 to C6)
-      const baseFreq = 261.63; // C4
-      const octaves = 2;
-      const semitones = octaves * 12;
-      const semitonesPerParticipant = semitones / totalParticipants;
-      const frequency = baseFreq * Math.pow(2, (participantIndex * semitonesPerParticipant) / 12);
+      // Stereo panning based on participant position
+      const panner = audioContext.createStereoPanner();
+      panner.pan.value = (participantIndex / totalParticipants) * 2 - 1; // -1 to 1
 
-      osc.frequency.value = frequency;
-      osc.type = 'sine';
+      // ADSR Envelope
+      const now = audioContext.currentTime;
+      const attackTime = 0.02;
+      const decayTime = 0.1;
+      const sustainLevel = 0.015; // Quieter overall
 
-      // Envelope
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.05, audioContext.currentTime + 0.01); // Quick attack
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.04, now + attackTime); // Attack
+      gainNode.gain.exponentialRampToValueAtTime(sustainLevel, now + attackTime + decayTime); // Decay to sustain
 
-      osc.connect(gainNode);
-      gainNode.connect(analyser);
+      // Connect: osc → filter → gain → panner → master
+      osc.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(panner);
+      panner.connect(masterGain);
 
       osc.start();
 
-      activeOscillators.set(participantId, { osc, gainNode });
+      activeOscillators.set(participantId, { osc, gainNode, filter, panner });
     }
 
     function stopNote(participantId, completionTime) {
