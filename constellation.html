@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HCP - Constellation Visualizer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+    }
+
+    #controls {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 20px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      max-width: 300px;
+    }
+
+    #controls h2 {
+      font-size: 1.2em;
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 15px;
+    }
+
+    #controls label {
+      display: block;
+      font-size: 0.9em;
+      margin-bottom: 8px;
+      opacity: 0.8;
+    }
+
+    #controls input,
+    #controls select {
+      width: 100%;
+      padding: 8px;
+      background: #1a1a1a;
+      border: 1px solid #333;
+      color: #fff;
+      border-radius: 5px;
+      font-size: 0.9em;
+      margin-bottom: 15px;
+    }
+
+    #controls button {
+      width: 100%;
+      padding: 10px;
+      background: #fff;
+      border: none;
+      color: #000;
+      border-radius: 5px;
+      font-size: 0.9em;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #controls button:hover {
+      background: #ddd;
+    }
+
+    #info {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.8);
+      padding: 15px 20px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      font-size: 0.85em;
+      max-width: 400px;
+    }
+
+    #info .round {
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 5px;
+    }
+
+    #info .reflection {
+      font-style: italic;
+      opacity: 0.9;
+      margin-top: 5px;
+    }
+
+    #toggle-controls {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      padding: 10px 20px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 1px solid #333;
+      color: #fff;
+      border-radius: 5px;
+      font-size: 0.9em;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #toggle-controls:hover {
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <button id="toggle-controls">Hide Controls</button>
+
+  <div id="controls">
+    <h2>Constellation</h2>
+    <label for="performance-select">Load Performance:</label>
+    <input type="file" id="performance-select" accept=".json">
+
+    <label for="speed">Animation Speed:</label>
+    <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1">
+
+    <button id="play-pause">Pause</button>
+    <button id="restart">Restart</button>
+  </div>
+
+  <div id="info" class="hidden">
+    <div class="round">Round <span id="round-num">0</span> / <span id="total-rounds">0</span></div>
+    <div id="narrative"></div>
+    <div class="reflection" id="reflection"></div>
+  </div>
+
+  <script>
+    // Performance data
+    let performanceData = null;
+    let currentRound = 0;
+    let roundProgress = 0;
+    let animationSpeed = 1;
+    let isPaused = false;
+
+    // Visualization objects
+    let agent;
+    let participants = [];
+    let connections = [];
+    let ripples = [];
+
+    // Agent class (central sun)
+    class Agent {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.baseSize = 60;
+        this.size = this.baseSize;
+        this.pulse = 0;
+      }
+
+      update() {
+        this.pulse += 0.05;
+        this.size = this.baseSize + sin(this.pulse) * 8;
+      }
+
+      draw() {
+        push();
+        // Glow
+        for (let i = 5; i > 0; i--) {
+          noStroke();
+          fill(255, 200, 100, 20);
+          circle(this.x, this.y, this.size + i * 15);
+        }
+        // Core
+        fill(255, 220, 150);
+        noStroke();
+        circle(this.x, this.y, this.size);
+        fill(255, 240, 200);
+        circle(this.x, this.y, this.size * 0.6);
+        pop();
+      }
+
+      sendRipple() {
+        ripples.push(new Ripple(this.x, this.y));
+      }
+    }
+
+    // Participant class (orbiting points)
+    class Participant {
+      constructor(id, totalCount) {
+        this.id = id;
+        this.angle = (id / totalCount) * TWO_PI;
+        this.distance = 200 + random(-50, 50);
+        this.targetDistance = this.distance;
+        this.size = 4;
+        this.targetSize = 4;
+        this.color = color(200, 200, 255);
+        this.targetColor = color(200, 200, 255);
+        this.glow = 0;
+        this.targetGlow = 0;
+        this.group = null;
+      }
+
+      setGroup(groupId, groupColor) {
+        this.group = groupId;
+        this.targetColor = groupColor;
+        this.targetDistance = 180 + groupId * 40;
+        this.targetGlow = 100;
+      }
+
+      resetGroup() {
+        this.group = null;
+        this.targetColor = color(200, 200, 255);
+        this.targetDistance = 200 + random(-50, 50);
+        this.targetGlow = 0;
+      }
+
+      update() {
+        // Smooth transitions
+        this.distance = lerp(this.distance, this.targetDistance, 0.05);
+        this.size = lerp(this.size, this.targetSize, 0.1);
+        this.glow = lerp(this.glow, this.targetGlow, 0.05);
+        this.color = lerpColor(this.color, this.targetColor, 0.05);
+
+        // Slow rotation
+        this.angle += 0.001;
+      }
+
+      draw() {
+        const x = width / 2 + cos(this.angle) * this.distance;
+        const y = height / 2 + sin(this.angle) * this.distance;
+
+        push();
+        // Glow when active
+        if (this.glow > 0) {
+          noStroke();
+          fill(red(this.color), green(this.color), blue(this.color), this.glow);
+          circle(x, y, this.size * 3);
+        }
+        // Particle
+        fill(this.color);
+        noStroke();
+        circle(x, y, this.size);
+        pop();
+      }
+
+      getPosition() {
+        return {
+          x: width / 2 + cos(this.angle) * this.distance,
+          y: height / 2 + sin(this.angle) * this.distance
+        };
+      }
+    }
+
+    // Connection class (threads between grouped participants)
+    class Connection {
+      constructor(p1, p2, groupColor) {
+        this.p1 = p1;
+        this.p2 = p2;
+        this.color = groupColor;
+        this.alpha = 0;
+        this.targetAlpha = 80;
+      }
+
+      update() {
+        this.alpha = lerp(this.alpha, this.targetAlpha, 0.05);
+      }
+
+      draw() {
+        if (this.alpha < 1) return;
+
+        const pos1 = this.p1.getPosition();
+        const pos2 = this.p2.getPosition();
+
+        push();
+        stroke(red(this.color), green(this.color), blue(this.color), this.alpha);
+        strokeWeight(0.5);
+        line(pos1.x, pos1.y, pos2.x, pos2.y);
+        pop();
+      }
+
+      fadeOut() {
+        this.targetAlpha = 0;
+      }
+    }
+
+    // Ripple class (instructions emanating from agent)
+    class Ripple {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.radius = 0;
+        this.maxRadius = 600;
+        this.alpha = 255;
+        this.speed = 3;
+      }
+
+      update() {
+        this.radius += this.speed;
+        this.alpha = map(this.radius, 0, this.maxRadius, 255, 0);
+      }
+
+      draw() {
+        if (this.radius > this.maxRadius) return;
+
+        push();
+        noFill();
+        stroke(255, 220, 150, this.alpha);
+        strokeWeight(2);
+        circle(this.x, this.y, this.radius * 2);
+        pop();
+      }
+
+      isDead() {
+        return this.radius > this.maxRadius;
+      }
+    }
+
+    // p5.js setup
+    function setup() {
+      createCanvas(windowWidth, windowHeight);
+
+      // Initialize agent at center
+      agent = new Agent(width / 2, height / 2);
+    }
+
+    // p5.js draw loop
+    function draw() {
+      background(0);
+
+      // Update and draw agent
+      agent.update();
+      agent.draw();
+
+      // Update and draw participants
+      for (let p of participants) {
+        p.update();
+        p.draw();
+      }
+
+      // Update and draw connections
+      for (let c of connections) {
+        c.update();
+        c.draw();
+      }
+
+      // Update and draw ripples
+      ripples = ripples.filter(r => !r.isDead());
+      for (let r of ripples) {
+        r.update();
+        r.draw();
+      }
+
+      // Animate performance
+      if (performanceData && !isPaused) {
+        animatePerformance();
+      }
+    }
+
+    // Animation logic
+    function animatePerformance() {
+      if (currentRound >= performanceData.rounds.length) {
+        return;
+      }
+
+      roundProgress += 0.001 * animationSpeed;
+
+      // Trigger round changes
+      if (roundProgress >= 1) {
+        currentRound++;
+        roundProgress = 0;
+
+        if (currentRound < performanceData.rounds.length) {
+          processRound(performanceData.rounds[currentRound]);
+        }
+      }
+    }
+
+    // Process round data
+    function processRound(round) {
+      console.log('Processing round', round.round_number);
+
+      // Update info panel
+      document.getElementById('round-num').textContent = round.round_number;
+      document.getElementById('narrative').textContent = round.narrative_thread;
+      document.getElementById('reflection').textContent = round.reflection;
+      document.getElementById('info').classList.remove('hidden');
+
+      // Send ripple for new instruction
+      agent.sendRipple();
+
+      // Clear old connections
+      for (let c of connections) {
+        c.fadeOut();
+      }
+
+      // Create new groups based on actions
+      const groupColors = [
+        color(255, 100, 100), // Red
+        color(100, 255, 100), // Green
+        color(100, 100, 255), // Blue
+        color(255, 255, 100), // Yellow
+        color(255, 100, 255), // Magenta
+        color(100, 255, 255), // Cyan
+      ];
+
+      // Assign participants to groups
+      let participantIndex = 0;
+      round.actions.forEach((action, actionIndex) => {
+        const groupSize = Math.floor((action.target_percent / 100) * participants.length);
+        const groupColor = groupColors[actionIndex % groupColors.length];
+
+        for (let i = 0; i < groupSize && participantIndex < participants.length; i++) {
+          participants[participantIndex].setGroup(actionIndex, groupColor);
+
+          // Create connections within group
+          for (let j = participantIndex + 1; j < participantIndex + groupSize && j < participants.length; j++) {
+            if (random() < 0.1) { // Only connect some pairs to avoid clutter
+              connections.push(new Connection(
+                participants[participantIndex],
+                participants[j],
+                groupColor
+              ));
+            }
+          }
+
+          participantIndex++;
+        }
+      });
+    }
+
+    // Load performance from file
+    document.getElementById('performance-select').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          performanceData = JSON.parse(e.target.result);
+          initializeVisualization();
+        } catch (error) {
+          console.error('Error loading performance:', error);
+          alert('Error loading performance file');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    // Initialize visualization with loaded data
+    function initializeVisualization() {
+      console.log('Loaded performance:', performanceData.performance_facts.name);
+
+      // Create participants
+      participants = [];
+      const count = performanceData.performance_facts.total_participants;
+      for (let i = 0; i < count; i++) {
+        participants.push(new Participant(i, count));
+      }
+
+      // Reset state
+      connections = [];
+      ripples = [];
+      currentRound = 0;
+      roundProgress = 0;
+      isPaused = false;
+
+      // Update info
+      document.getElementById('total-rounds').textContent = performanceData.rounds.length;
+
+      // Start first round
+      if (performanceData.rounds.length > 0) {
+        processRound(performanceData.rounds[0]);
+      }
+    }
+
+    // Controls
+    document.getElementById('speed').addEventListener('input', function(e) {
+      animationSpeed = parseFloat(e.target.value);
+    });
+
+    document.getElementById('play-pause').addEventListener('click', function() {
+      isPaused = !isPaused;
+      this.textContent = isPaused ? 'Play' : 'Pause';
+    });
+
+    document.getElementById('restart').addEventListener('click', function() {
+      if (performanceData) {
+        initializeVisualization();
+      }
+    });
+
+    document.getElementById('toggle-controls').addEventListener('click', function() {
+      const controls = document.getElementById('controls');
+      controls.classList.toggle('hidden');
+      this.textContent = controls.classList.contains('hidden') ? 'Show Controls' : 'Hide Controls';
+    });
+
+    // Handle window resize
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight);
+      if (agent) {
+        agent.x = width / 2;
+        agent.y = height / 2;
+      }
+    }
+  </script>
+</body>
+</html>

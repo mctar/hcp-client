@@ -1,0 +1,461 @@
+{
+  "performance_facts": {
+    "name": "Final dry run #1",
+    "start_time": "2025-11-12T18:33:04.548Z",
+    "end_time": "2025-11-12T18:35:40.886Z",
+    "duration_seconds": 156.338,
+    "total_participants": 281,
+    "total_rounds": 10
+  },
+  "calibration": {
+    "task": "Raise your hand",
+    "total_count": 281,
+    "completed_count": 280,
+    "avg_completion_time_sec": 3.027292857142856,
+    "responsiveness": 0.99644128113879
+  },
+  "rounds": [
+    {
+      "round_number": 1,
+      "observation": "The audience is poised and attentive, eager to engage in this shared experience.",
+      "strategy": "I aim to foster a sense of connection and community, encouraging collective participation.",
+      "narrative_thread": "Opening: Establishing trust",
+      "reflection": "Awakening together, the pulse of unity begins.",
+      "sentiment": "Curious",
+      "actions": [
+        {
+          "task": "Stand up then sit",
+          "target_percent": 30,
+          "actual_completed": 427,
+          "avg_time_sec": 2.6773466042154586
+        },
+        {
+          "task": "Smile",
+          "target_percent": 20,
+          "actual_completed": 516,
+          "avg_time_sec": 2.5622829457364342
+        },
+        {
+          "task": "Wave",
+          "target_percent": 20,
+          "actual_completed": 624,
+          "avg_time_sec": 2.4684775641025642
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 1.8588374851720049
+      }
+    },
+    {
+      "round_number": 2,
+      "observation": "The audience exhibits a growing sense of curiosity, engaging eagerly with the prompts.",
+      "strategy": "I aim to build a collective rhythm, deepening their connection through shared movements.",
+      "narrative_thread": "Building: Testing boundaries",
+      "reflection": "Awareness blooms in silent gestures.",
+      "sentiment": "Steady",
+      "actions": [
+        {
+          "task": "Stand up, stretch your arms up, sit",
+          "target_percent": 30,
+          "actual_completed": 877,
+          "avg_time_sec": 2.587212086659066
+        },
+        {
+          "task": "Smile",
+          "target_percent": 20,
+          "actual_completed": 947,
+          "avg_time_sec": 2.551975712777194
+        },
+        {
+          "task": "Point left",
+          "target_percent": 20,
+          "actual_completed": 1038,
+          "avg_time_sec": 2.5144816955684015
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 3.395017793594306
+      }
+    },
+    {
+      "round_number": 3,
+      "observation": "The audience's energy is vibrant, reflecting a growing connection and willingness to engage.",
+      "strategy": "I aim to deepen the shared experience through simple yet impactful gestures that foster unity.",
+      "narrative_thread": "Building: Testing Boundaries",
+      "reflection": "Echoes of connection weave through our shared breaths.",
+      "sentiment": "Exploring",
+      "actions": [
+        {
+          "task": "Stand up, then sit",
+          "target_percent": 25,
+          "actual_completed": 1304,
+          "avg_time_sec": 2.5978596625766897
+        },
+        {
+          "task": "Smile",
+          "target_percent": 20,
+          "actual_completed": 1381,
+          "avg_time_sec": 2.5701122375090515
+        },
+        {
+          "task": "Raise your hand and hold it up",
+          "target_percent": 25,
+          "actual_completed": 1493,
+          "avg_time_sec": 2.5292739450770263
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 4.956109134045077
+      }
+    },
+    {
+      "round_number": 4,
+      "observation": "The audience exhibits an enhanced focus, mirroring each other’s movements with ease.",
+      "strategy": "I aim to deepen the sense of interconnectedness, inviting participants to share in visual harmony.",
+      "narrative_thread": "Building: Strengthening bonds through synchronized gestures",
+      "reflection": "Hands rise in silent conversation.",
+      "sentiment": "Steady",
+      "actions": [
+        {
+          "task": "Raise your hand",
+          "target_percent": 30,
+          "actual_completed": 1722,
+          "avg_time_sec": 2.569002903600468
+        },
+        {
+          "task": "Look right",
+          "target_percent": 20,
+          "actual_completed": 1792,
+          "avg_time_sec": 2.5452081473214325
+        },
+        {
+          "task": "Smile",
+          "target_percent": 20,
+          "actual_completed": 1888,
+          "avg_time_sec": 2.5199274364406836
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 6.408066429418742
+      }
+    },
+    {
+      "round_number": 5,
+      "observation": "The audience is engaged and responsive, demonstrating a strong collective energy as they connect through simple gestures.",
+      "strategy": "In this round, I aim to deepen the sense of awareness and connection amongst the participants, guiding them to explore their surroundings.",
+      "narrative_thread": "Building: Expanding awareness",
+      "reflection": "The collective breath reaches outwards, embracing the moment.",
+      "sentiment": "Exploring",
+      "actions": [
+        {
+          "task": "Look up",
+          "target_percent": 30,
+          "actual_completed": 2164,
+          "avg_time_sec": 2.5674963031423337
+        },
+        {
+          "task": "Turn your head right",
+          "target_percent": 20,
+          "actual_completed": 2239,
+          "avg_time_sec": 2.5514359088878984
+        },
+        {
+          "task": "Smile",
+          "target_percent": 20,
+          "actual_completed": 2337,
+          "avg_time_sec": 2.531715019255458
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 7.995255041518386
+      }
+    },
+    {
+      "round_number": 6,
+      "observation": "The audience is engaged and responsive, effectively embodying unity through shared actions.",
+      "strategy": "To deepen the collective experience, I aim to enhance connection and awareness through synchronized gestures.",
+      "narrative_thread": "Building: Testing boundaries",
+      "reflection": "Threads of connection weave through our shared presence.",
+      "sentiment": "Steady",
+      "actions": [
+        {
+          "task": "Stand up then sit",
+          "target_percent": 30,
+          "actual_completed": 2573,
+          "avg_time_sec": 2.554322969296543
+        },
+        {
+          "task": "Wave",
+          "target_percent": 20,
+          "actual_completed": 2638,
+          "avg_time_sec": 2.5400913570887065
+        },
+        {
+          "task": "Look right",
+          "target_percent": 15,
+          "actual_completed": 2746,
+          "avg_time_sec": 2.5196380189366367
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 9.438908659549229
+      }
+    },
+    {
+      "round_number": 7,
+      "observation": "The audience is engaged and responsive, demonstrating a willingness to connect further. Energy flows as participants embrace the rhythm of collective gestures.",
+      "strategy": "I aim to deepen the sense of connection and unity among the audience, guiding them toward an emotional crescendo.",
+      "narrative_thread": "Building: Deepening connection",
+      "reflection": "Hands intertwine in the silence of understanding.",
+      "sentiment": "Steady",
+      "actions": [
+        {
+          "task": "Stand up, stretch your arms out, sit",
+          "target_percent": 30,
+          "actual_completed": 3004,
+          "avg_time_sec": 2.5426584553928104
+        },
+        {
+          "task": "Smile",
+          "target_percent": 20,
+          "actual_completed": 3086,
+          "avg_time_sec": 2.531275437459496
+        },
+        {
+          "task": "Look right",
+          "target_percent": 20,
+          "actual_completed": 3209,
+          "avg_time_sec": 2.5116949205359944
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 11.030842230130487
+      }
+    },
+    {
+      "round_number": 8,
+      "observation": "The audience displays a growing sense of connection, engaging with their surroundings more actively.",
+      "strategy": "I aim to deepen the emotional resonance of our shared experience, inviting spontaneous gestures that reflect unity.",
+      "narrative_thread": "Building: Testing boundaries",
+      "reflection": "Embracing the quiet power of collective presence.",
+      "sentiment": "Exploring",
+      "actions": [
+        {
+          "task": "Stand up, raise your hand, then sit",
+          "target_percent": 30,
+          "actual_completed": 3423,
+          "avg_time_sec": 2.5275600350569705
+        },
+        {
+          "task": "Turn your head right",
+          "target_percent": 20,
+          "actual_completed": 3492,
+          "avg_time_sec": 2.5182600229095113
+        },
+        {
+          "task": "Close your eyes, take a deep breath",
+          "target_percent": 20,
+          "actual_completed": 3609,
+          "avg_time_sec": 2.5022086450540377
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 12.483985765124553
+      }
+    },
+    {
+      "round_number": 9,
+      "observation": "The audience is engaged and responsive, creating a palpable sense of connection. Their movements reflect a growing comfort with collective expression.",
+      "strategy": "I aim to deepen the emotional resonance of unity while encouraging individual expression within the group. This round will invite introspection and shared presence.",
+      "narrative_thread": "Building: Testing boundaries",
+      "reflection": "In stillness, we find the strength to connect.",
+      "sentiment": "Steady",
+      "actions": [
+        {
+          "task": "Stand up, stretch your arms wide, then sit",
+          "target_percent": 30,
+          "actual_completed": 3857,
+          "avg_time_sec": 2.518983406792846
+        },
+        {
+          "task": "Smile and look up",
+          "target_percent": 20,
+          "actual_completed": 3920,
+          "avg_time_sec": 2.510454591836737
+        },
+        {
+          "task": "Raise your hand, close your eyes, then lower your hand",
+          "target_percent": 20,
+          "actual_completed": 4017,
+          "avg_time_sec": 2.495422454568088
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 13.990510083036774
+      }
+    },
+    {
+      "round_number": 10,
+      "observation": "The audience remains engaged and responsive, embracing the flow of connection.",
+      "strategy": "My intent is to deepen the sense of unity and quiet empowerment in this final round.",
+      "narrative_thread": "Climax: Collective synchrony",
+      "reflection": "In unity, we rise, echoing the heartbeat of presence.",
+      "sentiment": "Empowering",
+      "actions": [
+        {
+          "task": "Stand up, raise one arm high, then sit",
+          "target_percent": 30,
+          "actual_completed": 4255,
+          "avg_time_sec": 2.5136225616921317
+        },
+        {
+          "task": "Look right, then left",
+          "target_percent": 20,
+          "actual_completed": 4331,
+          "avg_time_sec": 2.5052389748326074
+        },
+        {
+          "task": "Smile broadly",
+          "target_percent": 20,
+          "actual_completed": 4443,
+          "avg_time_sec": 2.493395678595551
+        }
+      ],
+      "results": {
+        "total_instructions": 3,
+        "successful_instructions": 3,
+        "avg_responsiveness": 15.455516014234874
+      }
+    }
+  ],
+  "agent_self_reflection": {
+    "summary": "During the performance, I learned that the audience was highly responsive and engaged, as evidenced by the impressive completion rates across all rounds. The calibration phase established a strong baseline for participation, and this enthusiasm continued through each successive round. The most notable behavior was their willingness to follow multi-step instructions, which suggests that they were not only attentive but also invested in the experience. This indicates a favorable environment for more complex interactions in future performances.\n\nAnalyzing the success of specific instructions, the 'Smile' command consistently yielded high completion rates, illustrating its potential as an effective engagement tool. Conversely, the instruction to 'Look right' had lower response rates in some rounds, suggesting that it may not have been as compelling or clear. This discrepancy could be attributed to the less dynamic nature of the action compared to standing, raising hands, or smiling, which involve more physical engagement and energy.\n\nIn future performances, I would consider incorporating more varied and dynamic actions that maintain audience energy and engagement throughout the session. Additionally, I would experiment with rephrasing less successful commands or combining them with more engaging actions to enhance responsiveness. Overall, the performance highlighted the importance of understanding audience behavior and adapting instructions to optimize participation.",
+    "narrative_journey": [
+      {
+        "round": 1,
+        "observation": "The audience is poised and attentive, eager to engage in this shared experience.",
+        "strategy": "I aim to foster a sense of connection and community, encouraging collective participation.",
+        "narrative_thread": "Opening: Establishing trust",
+        "reflection": "Awakening together, the pulse of unity begins.",
+        "sentiment": "Curious"
+      },
+      {
+        "round": 2,
+        "observation": "The audience exhibits a growing sense of curiosity, engaging eagerly with the prompts.",
+        "strategy": "I aim to build a collective rhythm, deepening their connection through shared movements.",
+        "narrative_thread": "Building: Testing boundaries",
+        "reflection": "Awareness blooms in silent gestures.",
+        "sentiment": "Steady"
+      },
+      {
+        "round": 3,
+        "observation": "The audience's energy is vibrant, reflecting a growing connection and willingness to engage.",
+        "strategy": "I aim to deepen the shared experience through simple yet impactful gestures that foster unity.",
+        "narrative_thread": "Building: Testing Boundaries",
+        "reflection": "Echoes of connection weave through our shared breaths.",
+        "sentiment": "Exploring"
+      },
+      {
+        "round": 4,
+        "observation": "The audience exhibits an enhanced focus, mirroring each other’s movements with ease.",
+        "strategy": "I aim to deepen the sense of interconnectedness, inviting participants to share in visual harmony.",
+        "narrative_thread": "Building: Strengthening bonds through synchronized gestures",
+        "reflection": "Hands rise in silent conversation.",
+        "sentiment": "Steady"
+      },
+      {
+        "round": 5,
+        "observation": "The audience is engaged and responsive, demonstrating a strong collective energy as they connect through simple gestures.",
+        "strategy": "In this round, I aim to deepen the sense of awareness and connection amongst the participants, guiding them to explore their surroundings.",
+        "narrative_thread": "Building: Expanding awareness",
+        "reflection": "The collective breath reaches outwards, embracing the moment.",
+        "sentiment": "Exploring"
+      },
+      {
+        "round": 6,
+        "observation": "The audience is engaged and responsive, effectively embodying unity through shared actions.",
+        "strategy": "To deepen the collective experience, I aim to enhance connection and awareness through synchronized gestures.",
+        "narrative_thread": "Building: Testing boundaries",
+        "reflection": "Threads of connection weave through our shared presence.",
+        "sentiment": "Steady"
+      },
+      {
+        "round": 7,
+        "observation": "The audience is engaged and responsive, demonstrating a willingness to connect further. Energy flows as participants embrace the rhythm of collective gestures.",
+        "strategy": "I aim to deepen the sense of connection and unity among the audience, guiding them toward an emotional crescendo.",
+        "narrative_thread": "Building: Deepening connection",
+        "reflection": "Hands intertwine in the silence of understanding.",
+        "sentiment": "Steady"
+      },
+      {
+        "round": 8,
+        "observation": "The audience displays a growing sense of connection, engaging with their surroundings more actively.",
+        "strategy": "I aim to deepen the emotional resonance of our shared experience, inviting spontaneous gestures that reflect unity.",
+        "narrative_thread": "Building: Testing boundaries",
+        "reflection": "Embracing the quiet power of collective presence.",
+        "sentiment": "Exploring"
+      },
+      {
+        "round": 9,
+        "observation": "The audience is engaged and responsive, creating a palpable sense of connection. Their movements reflect a growing comfort with collective expression.",
+        "strategy": "I aim to deepen the emotional resonance of unity while encouraging individual expression within the group. This round will invite introspection and shared presence.",
+        "narrative_thread": "Building: Testing boundaries",
+        "reflection": "In stillness, we find the strength to connect.",
+        "sentiment": "Steady"
+      },
+      {
+        "round": 10,
+        "observation": "The audience remains engaged and responsive, embracing the flow of connection.",
+        "strategy": "My intent is to deepen the sense of unity and quiet empowerment in this final round.",
+        "narrative_thread": "Climax: Collective synchrony",
+        "reflection": "In unity, we rise, echoing the heartbeat of presence.",
+        "sentiment": "Empowering"
+      }
+    ]
+  },
+  "performance_metrics": {
+    "humanDynamics": {
+      "fastest": "2.5",
+      "slowest": "2.7",
+      "average": "2.5",
+      "fatiguePattern": "Consistent",
+      "fatigueColor": "#66ffd1",
+      "fatigueNote": "Stable performance maintained",
+      "nonCompliantCount": 0,
+      "nonCompliantPct": "0.0",
+      "nonCompliantColor": "#66ffd1",
+      "nonCompliantNote": "High compliance rate"
+    },
+    "systemPersonality": {
+      "controlStyle": "Highly Varied",
+      "controlColor": "#9effc7",
+      "bestCommand": "Look right",
+      "bestCommandRate": 100,
+      "commandDiversity": 20
+    },
+    "collectiveIntelligence": {
+      "totalConnections": 73352,
+      "density": 0,
+      "largestHub": 4443,
+      "isolatedCount": 55
+    }
+  }
+}
