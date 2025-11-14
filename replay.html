@@ -572,12 +572,18 @@
       // Get group color
       const groupColor = groupColors[groupId % groupColors.length];
 
-      // Activate participants in this group
+      // Activate participants in this group (create them if they don't exist)
       groupParticipants.forEach(participantId => {
-        const participant = participants.get(participantId);
-        if (participant) {
-          participant.setGroup(groupId, groupColor);
+        let participant = participants.get(participantId);
+        if (!participant) {
+          // Create participant dynamically
+          const totalParticipants = participants.size;
+          participant = new Participant(participantId, totalParticipants);
+          participants.set(participantId, participant);
+          // Update participant count display
+          document.getElementById('stat-participants').textContent = participants.size;
         }
+        participant.setGroup(groupId, groupColor);
       });
 
       // Create connections within group
