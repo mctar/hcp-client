@@ -174,12 +174,16 @@
 
     <div id="legend" class="hidden">
       <div>SONIFICATION MAPPING:</div>
+      <div><strong>Participants:</strong></div>
       <div>• Each participant = voice (filtered triangle wave)</div>
-      <div>• Participants mapped to pentatonic scale (C major)</div>
-      <div>• Instruction = note attack with ADSR envelope</div>
-      <div>• Completion speed → pitch bend (fast up, slow down)</div>
-      <div>• Spatial positioning → stereo panning</div>
-      <div>• Signal chain: filter → reverb → compressor</div>
+      <div>• Mapped to pentatonic scale across 3 octaves</div>
+      <div>• Instruction = note attack / Completion = pitch bend + release</div>
+      <div>• Stereo panning by participant position</div>
+      <div><strong>Sonic Scaffolding:</strong></div>
+      <div>• Bass drone follows harmonic root per round</div>
+      <div>• Ambient pad provides harmonic fifth</div>
+      <div>• Pulse click marks each instruction</div>
+      <div>• Round changes shift harmony (I-IV-V-II-VI)</div>
     </div>
   </div>
 
@@ -201,8 +205,19 @@
     let compressor = null;
     let convolver = null;
 
+    // Sonic scaffolding elements
+    let bassDrone = null;
+    let ambientPad = null;
+    let bassDroneGain = null;
+    let ambientPadGain = null;
+    let pulseOsc = null;
+    let pulseGain = null;
+
     // Musical scale (Pentatonic C major - more pleasant)
     const pentatonicScale = [0, 2, 4, 7, 9]; // Scale degrees
+
+    // Chord progressions (root notes for each round)
+    const chordRoots = [0, 4, 7, 2, 9]; // I, IV, V, II, VI in pentatonic
 
     // Audio setup
     function initAudio() {
@@ -211,7 +226,7 @@
 
         // Master gain (volume control)
         masterGain = audioContext.createGain();
-        masterGain.gain.value = 0.3;
+        masterGain.gain.value = 0.25; // Lower to make room for scaffolding
 
         // Compressor (prevent clipping)
         compressor = audioContext.createDynamicsCompressor();
@@ -233,6 +248,127 @@
         convolver.connect(compressor);
         compressor.connect(analyser);
         analyser.connect(audioContext.destination);
+
+        // Initialize sonic scaffolding
+        initSonicScaffolding();
+      }
+    }
+
+    function initSonicScaffolding() {
+      // Bass drone - provides harmonic foundation
+      bassDrone = audioContext.createOscillator();
+      bassDrone.type = 'sine';
+      bassDrone.frequency.value = 65.41; // C2
+
+      bassDroneGain = audioContext.createGain();
+      bassDroneGain.gain.value = 0; // Start silent
+
+      const bassDroneFilter = audioContext.createBiquadFilter();
+      bassDroneFilter.type = 'lowpass';
+      bassDroneFilter.frequency.value = 150;
+      bassDroneFilter.Q.value = 2;
+
+      bassDrone.connect(bassDroneFilter);
+      bassDroneFilter.connect(bassDroneGain);
+      bassDroneGain.connect(masterGain);
+
+      bassDrone.start();
+
+      // Ambient pad - creates atmosphere
+      ambientPad = audioContext.createOscillator();
+      ambientPad.type = 'sawtooth';
+      ambientPad.frequency.value = 130.81; // C3
+
+      ambientPadGain = audioContext.createGain();
+      ambientPadGain.gain.value = 0; // Start silent
+
+      const padFilter = audioContext.createBiquadFilter();
+      padFilter.type = 'lowpass';
+      padFilter.frequency.value = 800;
+      padFilter.Q.value = 0.5;
+
+      ambientPad.connect(padFilter);
+      padFilter.connect(ambientPadGain);
+      ambientPadGain.connect(masterGain);
+
+      ambientPad.start();
+
+      // Pulse oscillator for rhythmic markers
+      pulseOsc = audioContext.createOscillator();
+      pulseOsc.type = 'sine';
+      pulseOsc.frequency.value = 1047; // C6
+
+      pulseGain = audioContext.createGain();
+      pulseGain.gain.value = 0;
+
+      pulseOsc.connect(pulseGain);
+      pulseGain.connect(masterGain);
+
+      pulseOsc.start();
+    }
+
+    function setRoundHarmony(roundNumber) {
+      if (!audioContext || !bassDrone || !ambientPad) return;
+
+      try {
+        const chordIndex = roundNumber % chordRoots.length;
+        const rootSemitone = chordRoots[chordIndex];
+
+        // Bass drone follows root
+        const bassFreq = 65.41 * Math.pow(2, rootSemitone / 12); // C2 + semitones
+
+        const now = audioContext.currentTime;
+        bassDrone.frequency.exponentialRampToValueAtTime(bassFreq, now + 2);
+
+        // Ambient pad is a fifth above
+        const padFreq = bassFreq * 1.5; // Perfect fifth
+        ambientPad.frequency.exponentialRampToValueAtTime(padFreq, now + 2);
+
+        // Fade in bass drone
+        bassDroneGain.gain.cancelScheduledValues(now);
+        bassDroneGain.gain.setValueAtTime(bassDroneGain.gain.value, now);
+        bassDroneGain.gain.linearRampToValueAtTime(0.08, now + 1);
+
+        // Subtle ambient pad
+        ambientPadGain.gain.cancelScheduledValues(now);
+        ambientPadGain.gain.setValueAtTime(ambientPadGain.gain.value, now);
+        ambientPadGain.gain.linearRampToValueAtTime(0.02, now + 1.5);
+      } catch (error) {
+        console.error('Error setting round harmony:', error);
+      }
+    }
+
+    function playPulse() {
+      if (!audioContext || !pulseGain) return;
+
+      try {
+        const now = audioContext.currentTime;
+
+        // Quick click/pulse
+        pulseGain.gain.cancelScheduledValues(now);
+        pulseGain.gain.setValueAtTime(0, now);
+        pulseGain.gain.linearRampToValueAtTime(0.03, now + 0.005);
+        pulseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+      } catch (error) {
+        console.error('Error playing pulse:', error);
+      }
+    }
+
+    function fadeOutScaffolding() {
+      if (!audioContext || !bassDroneGain || !ambientPadGain) return;
+
+      try {
+        const now = audioContext.currentTime;
+
+        bassDroneGain.gain.cancelScheduledValues(now);
+        bassDroneGain.gain.setValueAtTime(bassDroneGain.gain.value, now);
+        bassDroneGain.gain.linearRampToValueAtTime(0, now + 2);
+
+        ambientPadGain.gain.cancelScheduledValues(now);
+        ambientPadGain.gain.setValueAtTime(ambientPadGain.gain.value, now);
+        ambientPadGain.gain.linearRampToValueAtTime(0, now + 2);
+      } catch (error) {
+        console.error('Error fading out scaffolding:', error);
       }
     }
 
@@ -333,6 +469,9 @@
         } catch (e) {}
       });
       activeOscillators.clear();
+
+      // Fade out scaffolding
+      fadeOutScaffolding();
 
       // Stop visualization
       if (animationId) {
@@ -450,13 +589,30 @@
         participantToIndex.set(id, index);
       });
 
+      // Track current round for harmony changes
+      let currentRound = -1;
+
       // Schedule all events
       replayData.events.forEach(event => {
         const eventTime = new Date(event.timestamp);
         const relativeTime = (eventTime - performanceStart) / playbackSpeed;
 
+        if (event.type === 'round_start') {
+          const roundNumber = event.round_number || 0;
+          const timeoutId = setTimeout(() => {
+            setRoundHarmony(roundNumber);
+          }, relativeTime);
+          scheduledEvents.push(timeoutId);
+        }
+
         if (event.type === 'instruction_sent') {
           const participants = event.data.participants || [];
+
+          // Play pulse for instruction
+          const pulseTimeoutId = setTimeout(() => {
+            playPulse();
+          }, relativeTime);
+          scheduledEvents.push(pulseTimeoutId);
 
           participants.forEach(participantId => {
             const participantIndex = participantToIndex.get(participantId);
@@ -488,6 +644,9 @@
       const completionTimeout = setTimeout(() => {
         // Mark as not playing first
         isPlaying = false;
+
+        // Fade out scaffolding
+        fadeOutScaffolding();
 
         // Let any remaining notes finish naturally (give 2 seconds)
         setTimeout(() => {
