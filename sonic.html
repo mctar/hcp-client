@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HCP - Sonic Analysis</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #000;
+      color: #0f0;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    #container {
+      width: 90%;
+      max-width: 900px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2em;
+      font-weight: 300;
+      letter-spacing: 0.3em;
+      margin-bottom: 40px;
+      text-transform: uppercase;
+      text-shadow: 0 0 10px #0f0;
+    }
+
+    #file-input-container {
+      margin-bottom: 60px;
+    }
+
+    #file-input {
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+      padding: 10px;
+      background: #000;
+      color: #0f0;
+      border: 1px solid #0f0;
+    }
+
+    #controls {
+      display: flex;
+      gap: 20px;
+      justify-content: center;
+      align-items: center;
+      margin-bottom: 40px;
+    }
+
+    button {
+      font-family: 'Courier New', monospace;
+      font-size: 1em;
+      padding: 15px 30px;
+      background: #000;
+      color: #0f0;
+      border: 2px solid #0f0;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      transition: all 0.2s;
+    }
+
+    button:hover:not(:disabled) {
+      background: #0f0;
+      color: #000;
+      box-shadow: 0 0 20px #0f0;
+    }
+
+    button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    #visualizer {
+      width: 100%;
+      height: 300px;
+      border: 1px solid #0f0;
+      margin-bottom: 40px;
+    }
+
+    #info {
+      font-size: 0.9em;
+      line-height: 2;
+      opacity: 0.7;
+    }
+
+    #info .label {
+      display: inline-block;
+      width: 150px;
+      text-align: right;
+      margin-right: 20px;
+      opacity: 0.5;
+    }
+
+    #progress {
+      margin-top: 20px;
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    #waveform {
+      position: relative;
+      width: 100%;
+      height: 300px;
+      background: #000;
+      border: 1px solid #0f0;
+      margin-bottom: 30px;
+    }
+
+    #legend {
+      font-size: 0.75em;
+      opacity: 0.6;
+      margin-top: 30px;
+      line-height: 1.8;
+    }
+
+    .speed-control {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="range"] {
+      width: 150px;
+    }
+
+    #speed-value {
+      min-width: 50px;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>Sonic Analysis</h1>
+
+    <div id="file-input-container">
+      <input type="file" id="file-input" accept=".json">
+    </div>
+
+    <div id="controls" class="hidden">
+      <button id="play-btn" disabled>▶ Play</button>
+      <button id="stop-btn" disabled>■ Stop</button>
+      <div class="speed-control">
+        <label for="speed">Speed:</label>
+        <input type="range" id="speed" min="0.5" max="8" step="0.5" value="4">
+        <span id="speed-value">4x</span>
+      </div>
+    </div>
+
+    <canvas id="visualizer" class="hidden"></canvas>
+
+    <div id="info" class="hidden">
+      <div><span class="label">Performance:</span><span id="perf-name">-</span></div>
+      <div><span class="label">Duration:</span><span id="perf-duration">-</span></div>
+      <div><span class="label">Participants:</span><span id="perf-participants">-</span></div>
+      <div><span class="label">Events:</span><span id="perf-events">-</span></div>
+      <div id="progress"><span class="label">Progress:</span><span id="progress-value">Ready</span></div>
+    </div>
+
+    <div id="legend" class="hidden">
+      <div>SONIFICATION MAPPING:</div>
+      <div>• Each participant = voice (sine wave oscillator)</div>
+      <div>• Instruction = note attack (sound begins)</div>
+      <div>• Completion speed → pitch (fast = high, slow = low)</div>
+      <div>• Simultaneous completions = chords</div>
+      <div>• Patterns → rhythms and harmonies</div>
+    </div>
+  </div>
+
+  <script>
+    let replayData = null;
+    let audioContext = null;
+    let isPlaying = false;
+    let playbackSpeed = 4;
+    let scheduledEvents = [];
+    let activeOscillators = new Map();
+    let analyser = null;
+    let canvas = null;
+    let canvasCtx = null;
+    let animationId = null;
+    let startTime = null;
+
+    // Audio setup
+    function initAudio() {
+      if (!audioContext) {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        analyser.connect(audioContext.destination);
+      }
+    }
+
+    // Load file
+    document.getElementById('file-input').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          replayData = JSON.parse(e.target.result);
+          loadPerformance();
+        } catch (error) {
+          console.error('Error loading replay:', error);
+          alert('Error loading replay file');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    function loadPerformance() {
+      console.log('Loading performance for sonification...');
+
+      initAudio();
+
+      // Extract info
+      const duration = new Date(replayData.metadata.end_time) -
+                      new Date(replayData.metadata.start_time);
+
+      document.getElementById('perf-name').textContent = replayData.metadata.name;
+      document.getElementById('perf-duration').textContent = `${(duration / 1000).toFixed(1)}s`;
+      document.getElementById('perf-participants').textContent = replayData.metadata.total_participants;
+      document.getElementById('perf-events').textContent = replayData.events.length;
+
+      // Show UI
+      document.getElementById('controls').classList.remove('hidden');
+      document.getElementById('visualizer').classList.remove('hidden');
+      document.getElementById('info').classList.remove('hidden');
+      document.getElementById('legend').classList.remove('hidden');
+      document.getElementById('play-btn').disabled = false;
+
+      // Setup visualizer
+      canvas = document.getElementById('visualizer');
+      canvasCtx = canvas.getContext('2d');
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    }
+
+    // Speed control
+    document.getElementById('speed').addEventListener('input', function(e) {
+      playbackSpeed = parseFloat(e.target.value);
+      document.getElementById('speed-value').textContent = `${playbackSpeed}x`;
+    });
+
+    // Play
+    document.getElementById('play-btn').addEventListener('click', async function() {
+      if (isPlaying) return;
+
+      initAudio();
+
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
+      isPlaying = true;
+      document.getElementById('play-btn').disabled = true;
+      document.getElementById('stop-btn').disabled = false;
+      document.getElementById('progress-value').textContent = 'Playing...';
+
+      sonifyPerformance();
+      visualize();
+    });
+
+    // Stop
+    document.getElementById('stop-btn').addEventListener('click', function() {
+      stopPlayback();
+    });
+
+    function stopPlayback() {
+      isPlaying = false;
+
+      // Cancel all scheduled events
+      scheduledEvents.forEach(id => clearTimeout(id));
+      scheduledEvents = [];
+
+      // Stop all active oscillators
+      activeOscillators.forEach(osc => {
+        try {
+          osc.stop();
+        } catch (e) {}
+      });
+      activeOscillators.clear();
+
+      // Stop visualization
+      if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+      }
+
+      document.getElementById('play-btn').disabled = false;
+      document.getElementById('stop-btn').disabled = true;
+      document.getElementById('progress-value').textContent = 'Stopped';
+    }
+
+    function sonifyPerformance() {
+      const performanceStart = new Date(replayData.metadata.start_time);
+      const now = audioContext.currentTime;
+      startTime = Date.now();
+
+      // Build participant ID to index mapping
+      const participantIds = new Set();
+      replayData.events.forEach(event => {
+        if (event.participant_id) participantIds.add(event.participant_id);
+        if (event.data?.participants) {
+          event.data.participants.forEach(id => participantIds.add(id));
+        }
+      });
+      const participantArray = Array.from(participantIds).sort();
+      const participantToIndex = new Map();
+      participantArray.forEach((id, index) => {
+        participantToIndex.set(id, index);
+      });
+
+      // Schedule all events
+      replayData.events.forEach(event => {
+        const eventTime = new Date(event.timestamp);
+        const relativeTime = (eventTime - performanceStart) / playbackSpeed;
+
+        if (event.type === 'instruction_sent') {
+          const participants = event.data.participants || [];
+
+          participants.forEach(participantId => {
+            const participantIndex = participantToIndex.get(participantId);
+            if (participantIndex === undefined) return;
+
+            // Schedule note-on
+            const timeoutId = setTimeout(() => {
+              playNote(participantId, participantIndex, participantArray.length);
+            }, relativeTime);
+
+            scheduledEvents.push(timeoutId);
+          });
+        }
+
+        if (event.type === 'task_completed') {
+          const participantId = event.participant_id;
+          const completionTime = event.data.completion_time_ms;
+
+          const timeoutId = setTimeout(() => {
+            stopNote(participantId, completionTime);
+          }, relativeTime);
+
+          scheduledEvents.push(timeoutId);
+        }
+      });
+
+      // Schedule completion
+      const totalDuration = (new Date(replayData.metadata.end_time) - performanceStart) / playbackSpeed;
+      const completionTimeout = setTimeout(() => {
+        stopPlayback();
+        document.getElementById('progress-value').textContent = 'Complete';
+      }, totalDuration);
+      scheduledEvents.push(completionTimeout);
+    }
+
+    function playNote(participantId, participantIndex, totalParticipants) {
+      if (!isPlaying) return;
+
+      // Create oscillator
+      const osc = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      // Calculate frequency based on participant index
+      // Spread across 2 octaves (C4 to C6)
+      const baseFreq = 261.63; // C4
+      const octaves = 2;
+      const semitones = octaves * 12;
+      const semitonesPerParticipant = semitones / totalParticipants;
+      const frequency = baseFreq * Math.pow(2, (participantIndex * semitonesPerParticipant) / 12);
+
+      osc.frequency.value = frequency;
+      osc.type = 'sine';
+
+      // Envelope
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.05, audioContext.currentTime + 0.01); // Quick attack
+
+      osc.connect(gainNode);
+      gainNode.connect(analyser);
+
+      osc.start();
+
+      activeOscillators.set(participantId, { osc, gainNode });
+    }
+
+    function stopNote(participantId, completionTime) {
+      if (!isPlaying) return;
+
+      const active = activeOscillators.get(participantId);
+      if (!active) return;
+
+      const { osc, gainNode } = active;
+
+      // Pitch shift based on completion speed
+      // Fast = pitch up, slow = pitch down
+      let pitchMultiplier;
+      if (completionTime < 2000) {
+        pitchMultiplier = 1.5; // Fast - up a fifth
+      } else if (completionTime < 5000) {
+        pitchMultiplier = 1.0; // Medium - same pitch
+      } else {
+        pitchMultiplier = 0.75; // Slow - down a fourth
+      }
+
+      const currentFreq = osc.frequency.value;
+      osc.frequency.exponentialRampToValueAtTime(
+        currentFreq * pitchMultiplier,
+        audioContext.currentTime + 0.1
+      );
+
+      // Release
+      gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+
+      setTimeout(() => {
+        try {
+          osc.stop();
+        } catch (e) {}
+        activeOscillators.delete(participantId);
+      }, 400);
+    }
+
+    function visualize() {
+      if (!isPlaying) return;
+
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array(bufferLength);
+
+      function draw() {
+        if (!isPlaying) return;
+
+        animationId = requestAnimationFrame(draw);
+
+        analyser.getByteTimeDomainData(dataArray);
+
+        canvasCtx.fillStyle = 'rgb(0, 0, 0)';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        canvasCtx.lineWidth = 2;
+        canvasCtx.strokeStyle = 'rgb(0, 255, 0)';
+        canvasCtx.shadowBlur = 10;
+        canvasCtx.shadowColor = 'rgb(0, 255, 0)';
+
+        canvasCtx.beginPath();
+
+        const sliceWidth = canvas.width / bufferLength;
+        let x = 0;
+
+        for (let i = 0; i < bufferLength; i++) {
+          const v = dataArray[i] / 128.0;
+          const y = v * canvas.height / 2;
+
+          if (i === 0) {
+            canvasCtx.moveTo(x, y);
+          } else {
+            canvasCtx.lineTo(x, y);
+          }
+
+          x += sliceWidth;
+        }
+
+        canvasCtx.lineTo(canvas.width, canvas.height / 2);
+        canvasCtx.stroke();
+
+        // Update progress
+        if (startTime) {
+          const elapsed = (Date.now() - startTime) / 1000;
+          const totalDuration = (new Date(replayData.metadata.end_time) -
+                                new Date(replayData.metadata.start_time)) / 1000 / playbackSpeed;
+          const progress = Math.min(100, (elapsed / totalDuration) * 100);
+          document.getElementById('progress-value').textContent =
+            `${progress.toFixed(1)}% (${elapsed.toFixed(1)}s / ${totalDuration.toFixed(1)}s)`;
+        }
+      }
+
+      draw();
+    }
+  </script>
+</body>
+</html>
