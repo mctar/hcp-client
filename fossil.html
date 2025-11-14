@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HCP - Fossil Record</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.7.0/p5.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0a0a0a;
+      color: #999;
+      overflow: hidden;
+    }
+
+    #controls {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      background: rgba(10, 10, 10, 0.95);
+      padding: 20px;
+      border-radius: 3px;
+      border: 1px solid #333;
+      max-width: 300px;
+    }
+
+    #controls h2 {
+      font-size: 0.9em;
+      font-weight: 400;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      margin-bottom: 15px;
+      color: #666;
+    }
+
+    #controls label {
+      display: block;
+      font-size: 0.75em;
+      margin-bottom: 5px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    #controls input[type="file"],
+    #controls input[type="range"] {
+      width: 100%;
+      margin-bottom: 15px;
+    }
+
+    #controls input[type="range"] {
+      background: transparent;
+    }
+
+    #controls button {
+      width: 100%;
+      padding: 8px;
+      background: transparent;
+      border: 1px solid #333;
+      color: #999;
+      border-radius: 3px;
+      font-size: 0.75em;
+      font-family: 'Courier New', monospace;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 8px;
+    }
+
+    #controls button:hover {
+      border-color: #666;
+      color: #ccc;
+    }
+
+    #controls button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .speed-display {
+      font-size: 0.75em;
+      opacity: 0.5;
+      margin-bottom: 15px;
+    }
+
+    #timeline {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 150px;
+      background: rgba(10, 10, 10, 0.95);
+      border-top: 1px solid #333;
+      z-index: 100;
+    }
+
+    #timeline canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    #event-info {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(10, 10, 10, 0.95);
+      padding: 20px;
+      border-radius: 3px;
+      border: 1px solid #333;
+      max-width: 400px;
+      font-size: 0.75em;
+      line-height: 1.6;
+      letter-spacing: 0.05em;
+    }
+
+    #event-info .label {
+      color: #666;
+      text-transform: uppercase;
+      font-size: 0.85em;
+      margin-top: 10px;
+      margin-bottom: 3px;
+    }
+
+    #event-info .label:first-child {
+      margin-top: 0;
+    }
+
+    #event-info .value {
+      color: #ccc;
+    }
+
+    .legend {
+      position: fixed;
+      bottom: 170px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(10, 10, 10, 0.95);
+      padding: 15px;
+      border-radius: 3px;
+      border: 1px solid #333;
+      font-size: 0.7em;
+      letter-spacing: 0.05em;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .legend-item:last-child {
+      margin-bottom: 0;
+    }
+
+    .legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+  <div id="controls">
+    <h2>Fossil Record</h2>
+    <label for="file-input">Load Replay:</label>
+    <input type="file" id="file-input" accept=".json">
+
+    <label for="speed">Playback Speed:</label>
+    <input type="range" id="speed" min="1" max="20" step="1" value="5">
+    <div class="speed-display">Speed: <span id="speed-value">5</span>x</div>
+
+    <button id="play-pause" disabled>Play</button>
+    <button id="restart" disabled>Restart</button>
+  </div>
+
+  <div id="event-info" class="hidden">
+    <div class="label">Round</div>
+    <div class="value" id="info-round">-</div>
+
+    <div class="label">Strategy</div>
+    <div class="value" id="info-strategy">-</div>
+
+    <div class="label">Current Event</div>
+    <div class="value" id="info-event">-</div>
+
+    <div class="label">Progress</div>
+    <div class="value" id="info-progress">-</div>
+  </div>
+
+  <div class="legend hidden" id="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background: #444;"></div>
+      <div>Idle</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: #66ffd1; box-shadow: 0 0 8px #66ffd1;"></div>
+      <div>Selected</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: #ffd166; box-shadow: 0 0 8px #ffd166;"></div>
+      <div>Working</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: #9effc7; box-shadow: 0 0 8px #9effc7;"></div>
+      <div>Fast Complete</div>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background: #888; box-shadow: 0 0 8px #888;"></div>
+      <div>Slow Complete</div>
+    </div>
+  </div>
+
+  <div id="timeline" class="hidden"></div>
+
+  <script>
+    // Data
+    let replayData = null;
+    let currentEventIndex = 0;
+    let playbackSpeed = 5;
+    let isPlaying = false;
+    let lastEventTime = 0;
+
+    // Visualization
+    let agent;
+    let participants = new Map();
+    let instructionBeams = [];
+    let completionFlows = [];
+
+    // Current round tracking
+    let currentRound = 0;
+    let currentStrategy = '';
+
+    // Particle states
+    const STATE_IDLE = 'idle';
+    const STATE_SELECTED = 'selected';
+    const STATE_WORKING = 'working';
+    const STATE_COMPLETED = 'completed';
+
+    // Agent (central node)
+    class Agent {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.size = 40;
+        this.pulse = 0;
+        this.glow = 0;
+        this.targetGlow = 20;
+      }
+
+      update() {
+        this.pulse += 0.03;
+        this.glow = lerp(this.glow, this.targetGlow, 0.1);
+      }
+
+      draw() {
+        push();
+
+        // Glow
+        for (let i = 4; i > 0; i--) {
+          noStroke();
+          fill(102, 255, 209, this.glow * (i / 4));
+          circle(this.x, this.y, this.size + (i * 10) + sin(this.pulse) * 5);
+        }
+
+        // Core
+        fill(30, 30, 30);
+        stroke(102, 255, 209);
+        strokeWeight(2);
+        circle(this.x, this.y, this.size);
+
+        // Inner ring
+        noFill();
+        stroke(102, 255, 209, 150);
+        strokeWeight(1);
+        circle(this.x, this.y, this.size * 0.6 + sin(this.pulse * 2) * 3);
+
+        pop();
+      }
+
+      flash() {
+        this.targetGlow = 40;
+        setTimeout(() => { this.targetGlow = 20; }, 300);
+      }
+    }
+
+    // Participant node
+    class Participant {
+      constructor(id, index, total) {
+        this.id = id;
+        this.angle = (index / total) * TWO_PI;
+        this.distance = 250;
+        this.size = 6;
+        this.state = STATE_IDLE;
+        this.color = color(68, 68, 68);
+        this.targetColor = this.color;
+        this.glow = 0;
+        this.targetGlow = 0;
+        this.completionTime = 0;
+      }
+
+      setState(newState, completionTime = 0) {
+        this.state = newState;
+        this.completionTime = completionTime;
+
+        switch(newState) {
+          case STATE_IDLE:
+            this.targetColor = color(68, 68, 68);
+            this.targetGlow = 0;
+            break;
+          case STATE_SELECTED:
+            this.targetColor = color(102, 255, 209);
+            this.targetGlow = 30;
+            break;
+          case STATE_WORKING:
+            this.targetColor = color(255, 209, 102);
+            this.targetGlow = 20;
+            break;
+          case STATE_COMPLETED:
+            // Fast completions are bright green, slow are gray
+            if (completionTime < 2000) {
+              this.targetColor = color(158, 255, 199);
+              this.targetGlow = 40;
+            } else if (completionTime < 5000) {
+              this.targetColor = color(158, 255, 199);
+              this.targetGlow = 25;
+            } else {
+              this.targetColor = color(136, 136, 136);
+              this.targetGlow = 15;
+            }
+            // Fade back to idle after showing completion
+            setTimeout(() => {
+              if (this.state === STATE_COMPLETED) {
+                this.setState(STATE_IDLE);
+              }
+            }, 2000);
+            break;
+        }
+      }
+
+      update() {
+        this.color = lerpColor(this.color, this.targetColor, 0.1);
+        this.glow = lerp(this.glow, this.targetGlow, 0.1);
+        this.angle += 0.0005;
+      }
+
+      draw() {
+        const x = width / 2 + cos(this.angle) * this.distance;
+        const y = height / 2 + sin(this.angle) * this.distance;
+
+        push();
+
+        // Glow
+        if (this.glow > 1) {
+          for (let i = 3; i > 0; i--) {
+            noStroke();
+            fill(red(this.color), green(this.color), blue(this.color), this.glow * (i / 3));
+            circle(x, y, this.size + (i * 4));
+          }
+        }
+
+        // Particle
+        fill(this.color);
+        noStroke();
+        circle(x, y, this.size);
+
+        pop();
+      }
+
+      getPosition() {
+        return {
+          x: width / 2 + cos(this.angle) * this.distance,
+          y: height / 2 + sin(this.angle) * this.distance
+        };
+      }
+    }
+
+    // Instruction beam (agent → participant)
+    class InstructionBeam {
+      constructor(fromPos, toPos, groupColor) {
+        this.from = fromPos;
+        this.to = toPos;
+        this.progress = 0;
+        this.alpha = 0;
+        this.targetAlpha = 150;
+        this.color = groupColor;
+      }
+
+      update() {
+        this.progress = min(this.progress + 0.05, 1);
+        this.alpha = lerp(this.alpha, this.targetAlpha, 0.1);
+
+        if (this.progress >= 1) {
+          this.targetAlpha = 0;
+        }
+      }
+
+      draw() {
+        if (this.alpha < 1) return;
+
+        const currentX = lerp(this.from.x, this.to.x, this.progress);
+        const currentY = lerp(this.from.y, this.to.y, this.progress);
+
+        push();
+
+        // Beam trail
+        stroke(red(this.color), green(this.color), blue(this.color), this.alpha * 0.3);
+        strokeWeight(1);
+        line(this.from.x, this.from.y, currentX, currentY);
+
+        // Beam head
+        fill(red(this.color), green(this.color), blue(this.color), this.alpha);
+        noStroke();
+        circle(currentX, currentY, 4);
+
+        pop();
+      }
+
+      isDead() {
+        return this.progress >= 1 && this.alpha < 1;
+      }
+    }
+
+    // Completion flow (participant → agent)
+    class CompletionFlow {
+      constructor(fromPos, toPos, fast = true) {
+        this.from = fromPos;
+        this.to = toPos;
+        this.progress = 0;
+        this.alpha = 255;
+        this.fast = fast;
+        this.color = fast ? color(158, 255, 199) : color(136, 136, 136);
+      }
+
+      update() {
+        this.progress = min(this.progress + 0.08, 1);
+        if (this.progress >= 0.8) {
+          this.alpha = map(this.progress, 0.8, 1, 255, 0);
+        }
+      }
+
+      draw() {
+        if (this.progress >= 1) return;
+
+        const currentX = lerp(this.from.x, this.to.x, this.progress);
+        const currentY = lerp(this.from.y, this.to.y, this.progress);
+
+        push();
+
+        // Flow particle
+        fill(red(this.color), green(this.color), blue(this.color), this.alpha);
+        noStroke();
+        circle(currentX, currentY, 3);
+
+        // Trail
+        stroke(red(this.color), green(this.color), blue(this.color), this.alpha * 0.3);
+        strokeWeight(1);
+        const trailLength = 20;
+        const trailX = lerp(this.from.x, this.to.x, max(0, this.progress - 0.1));
+        const trailY = lerp(this.from.y, this.to.y, max(0, this.progress - 0.1));
+        line(trailX, trailY, currentX, currentY);
+
+        pop();
+      }
+
+      isDead() {
+        return this.progress >= 1;
+      }
+    }
+
+    // p5.js setup
+    function setup() {
+      createCanvas(windowWidth, windowHeight - 150);
+      agent = new Agent(width / 2, height / 2);
+    }
+
+    // p5.js draw
+    function draw() {
+      background(10, 10, 10);
+
+      // Draw agent
+      if (agent) {
+        agent.update();
+        agent.draw();
+      }
+
+      // Draw participants
+      for (let p of participants.values()) {
+        p.update();
+        p.draw();
+      }
+
+      // Draw instruction beams
+      instructionBeams = instructionBeams.filter(b => !b.isDead());
+      for (let beam of instructionBeams) {
+        beam.update();
+        beam.draw();
+      }
+
+      // Draw completion flows
+      completionFlows = completionFlows.filter(f => !f.isDead());
+      for (let flow of completionFlows) {
+        flow.update();
+        flow.draw();
+      }
+
+      // Process events
+      if (replayData && isPlaying) {
+        processEvents();
+      }
+    }
+
+    // Process events with timing
+    function processEvents() {
+      if (currentEventIndex >= replayData.events.length) {
+        isPlaying = false;
+        document.getElementById('play-pause').textContent = 'Play';
+        return;
+      }
+
+      const now = millis();
+      const event = replayData.events[currentEventIndex];
+
+      // Calculate delay
+      if (currentEventIndex > 0) {
+        const prevEvent = replayData.events[currentEventIndex - 1];
+        const eventDelay = (new Date(event.timestamp) - new Date(prevEvent.timestamp));
+        const scaledDelay = eventDelay / playbackSpeed;
+
+        if (now - lastEventTime < scaledDelay) {
+          return;
+        }
+      }
+
+      // Process event
+      handleEvent(event);
+
+      // Next event
+      currentEventIndex++;
+      lastEventTime = now;
+
+      // Update UI
+      updateProgress();
+    }
+
+    // Handle events
+    function handleEvent(event) {
+      console.log('Event:', event.type);
+
+      switch (event.type) {
+        case 'participant_join':
+          handleParticipantJoin(event);
+          break;
+        case 'round_start':
+          handleRoundStart(event);
+          break;
+        case 'instruction_sent':
+          handleInstructionSent(event);
+          break;
+        case 'task_completed':
+          handleTaskCompleted(event);
+          break;
+        case 'round_end':
+          handleRoundEnd(event);
+          break;
+      }
+
+      updateEventInfo(event);
+    }
+
+    function handleParticipantJoin(event) {
+      const id = event.participant_id;
+      const index = participants.size;
+      const total = Math.max(50, participants.size + 1); // Estimate total
+
+      const p = new Participant(id, index, total);
+      participants.set(id, p);
+    }
+
+    function handleRoundStart(event) {
+      currentRound = event.round_number;
+      currentStrategy = event.data.strategy || '';
+
+      // Reset all participants to idle
+      for (let p of participants.values()) {
+        p.setState(STATE_IDLE);
+      }
+
+      agent.flash();
+    }
+
+    function handleInstructionSent(event) {
+      const groupParticipants = event.data.participants || [];
+      const groupColor = color(102, 255, 209);
+
+      agent.flash();
+
+      // Create beams to selected participants
+      groupParticipants.forEach(pid => {
+        let p = participants.get(pid);
+
+        // Create participant if doesn't exist
+        if (!p) {
+          const index = participants.size;
+          const total = Math.max(50, participants.size + 1);
+          p = new Participant(pid, index, total);
+          participants.set(pid, p);
+        }
+
+        // Set state and create beam
+        p.setState(STATE_SELECTED);
+
+        const beam = new InstructionBeam(
+          { x: agent.x, y: agent.y },
+          p.getPosition(),
+          groupColor
+        );
+        instructionBeams.push(beam);
+
+        // Transition to working after beam arrives
+        setTimeout(() => {
+          if (p.state === STATE_SELECTED) {
+            p.setState(STATE_WORKING);
+          }
+        }, 1000);
+      });
+    }
+
+    function handleTaskCompleted(event) {
+      const pid = event.participant_id;
+      const completionTime = event.data.completion_time_ms;
+
+      const p = participants.get(pid);
+      if (p) {
+        p.setState(STATE_COMPLETED, completionTime);
+
+        // Create flow back to agent
+        const flow = new CompletionFlow(
+          p.getPosition(),
+          { x: agent.x, y: agent.y },
+          completionTime < 3000
+        );
+        completionFlows.push(flow);
+      }
+    }
+
+    function handleRoundEnd(event) {
+      // Keep participants in their current states
+      // They'll reset on next round start
+    }
+
+    function updateEventInfo(event) {
+      document.getElementById('info-round').textContent = currentRound;
+      document.getElementById('info-strategy').textContent = currentStrategy;
+      document.getElementById('info-event').textContent = event.type.replace('_', ' ');
+    }
+
+    function updateProgress() {
+      const progress = Math.round((currentEventIndex / replayData.events.length) * 100);
+      document.getElementById('info-progress').textContent =
+        `${currentEventIndex} / ${replayData.events.length} (${progress}%)`;
+    }
+
+    // Load file
+    document.getElementById('file-input').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          replayData = JSON.parse(e.target.result);
+          initializeReplay();
+        } catch (error) {
+          console.error('Error loading replay:', error);
+          alert('Error loading replay file');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    function initializeReplay() {
+      console.log('Loaded replay:', replayData.performance_id);
+
+      // Reset
+      participants.clear();
+      instructionBeams = [];
+      completionFlows = [];
+      currentEventIndex = 0;
+      currentRound = 0;
+      currentStrategy = '';
+      isPlaying = false;
+      lastEventTime = millis();
+
+      // Enable controls
+      document.getElementById('play-pause').disabled = false;
+      document.getElementById('restart').disabled = false;
+      document.getElementById('event-info').classList.remove('hidden');
+      document.getElementById('legend').classList.remove('hidden');
+      document.getElementById('timeline').classList.remove('hidden');
+
+      updateProgress();
+    }
+
+    // Controls
+    document.getElementById('speed').addEventListener('input', function(e) {
+      playbackSpeed = parseInt(e.target.value);
+      document.getElementById('speed-value').textContent = playbackSpeed;
+    });
+
+    document.getElementById('play-pause').addEventListener('click', function() {
+      if (!replayData) return;
+      isPlaying = !isPlaying;
+      this.textContent = isPlaying ? 'Pause' : 'Play';
+      if (isPlaying) {
+        lastEventTime = millis();
+      }
+    });
+
+    document.getElementById('restart').addEventListener('click', function() {
+      if (replayData) {
+        initializeReplay();
+      }
+    });
+
+    // Window resize
+    function windowResized() {
+      resizeCanvas(windowWidth, windowHeight - 150);
+      if (agent) {
+        agent.x = width / 2;
+        agent.y = height / 2;
+      }
+    }
+  </script>
+</body>
+</html>
