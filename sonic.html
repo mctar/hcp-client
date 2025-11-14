@@ -238,21 +238,28 @@
 
     // Create simple reverb using convolver
     function createReverb() {
-      convolver = audioContext.createConvolver();
+      try {
+        convolver = audioContext.createConvolver();
 
-      // Create impulse response (simple reverb)
-      const sampleRate = audioContext.sampleRate;
-      const length = sampleRate * 2; // 2 second reverb
-      const impulse = audioContext.createBuffer(2, length, sampleRate);
+        // Create impulse response (simple reverb)
+        const sampleRate = audioContext.sampleRate;
+        const length = sampleRate * 2; // 2 second reverb
+        const impulse = audioContext.createBuffer(2, length, sampleRate);
 
-      for (let channel = 0; channel < 2; channel++) {
-        const channelData = impulse.getChannelData(channel);
-        for (let i = 0; i < length; i++) {
-          channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+        for (let channel = 0; channel < 2; channel++) {
+          const channelData = impulse.getChannelData(channel);
+          for (let i = 0; i < length; i++) {
+            channelData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+          }
         }
-      }
 
-      convolver.buffer = impulse;
+        convolver.buffer = impulse;
+      } catch (error) {
+        console.error('Error creating reverb:', error);
+        // Fall back to no reverb
+        convolver = audioContext.createGain();
+        convolver.gain.value = 1;
+      }
     }
 
     // Load file
@@ -311,19 +318,30 @@
     document.getElementById('play-btn').addEventListener('click', async function() {
       if (isPlaying) return;
 
-      initAudio();
+      try {
+        initAudio();
 
-      if (audioContext.state === 'suspended') {
-        await audioContext.resume();
+        if (!audioContext) {
+          alert('Failed to initialize audio context');
+          return;
+        }
+
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+
+        isPlaying = true;
+        document.getElementById('play-btn').disabled = true;
+        document.getElementById('stop-btn').disabled = false;
+        document.getElementById('progress-value').textContent = 'Playing...';
+
+        sonifyPerformance();
+        visualize();
+      } catch (error) {
+        console.error('Error starting playback:', error);
+        alert('Error starting playback: ' + error.message);
+        stopPlayback();
       }
-
-      isPlaying = true;
-      document.getElementById('play-btn').disabled = true;
-      document.getElementById('stop-btn').disabled = false;
-      document.getElementById('progress-value').textContent = 'Playing...';
-
-      sonifyPerformance();
-      visualize();
     });
 
     // Stop
@@ -338,11 +356,21 @@
       scheduledEvents.forEach(id => clearTimeout(id));
       scheduledEvents = [];
 
-      // Stop all active oscillators
-      activeOscillators.forEach(active => {
+      // Stop all active oscillators gracefully
+      const now = audioContext ? audioContext.currentTime : 0;
+      activeOscillators.forEach((active, participantId) => {
         try {
-          active.osc.stop();
-        } catch (e) {}
+          if (audioContext && active.gainNode) {
+            active.gainNode.gain.cancelScheduledValues(now);
+            active.gainNode.gain.setValueAtTime(active.gainNode.gain.value, now);
+            active.gainNode.gain.linearRampToValueAtTime(0, now + 0.05);
+          }
+          if (active.osc) {
+            active.osc.stop(now + 0.1);
+          }
+        } catch (e) {
+          console.error('Error stopping oscillator:', e);
+        }
       });
       activeOscillators.clear();
 
@@ -419,95 +447,138 @@
     }
 
     function playNote(participantId, participantIndex, totalParticipants) {
-      if (!isPlaying) return;
+      if (!isPlaying || !audioContext) return;
 
-      // Quantize to pentatonic scale
-      const octaves = 3; // Spread across 3 octaves
-      const notesPerOctave = pentatonicScale.length;
-      const totalNotes = octaves * notesPerOctave;
+      try {
+        // Clean up any existing note for this participant
+        const existing = activeOscillators.get(participantId);
+        if (existing) {
+          try {
+            existing.gainNode.gain.cancelScheduledValues(audioContext.currentTime);
+            existing.gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+            existing.osc.stop(audioContext.currentTime);
+          } catch (e) {}
+          activeOscillators.delete(participantId);
+        }
 
-      const noteIndex = Math.floor((participantIndex / totalParticipants) * totalNotes);
-      const octave = Math.floor(noteIndex / notesPerOctave);
-      const scaleIndex = noteIndex % notesPerOctave;
+        // Quantize to pentatonic scale
+        const octaves = 3; // Spread across 3 octaves
+        const notesPerOctave = pentatonicScale.length;
+        const totalNotes = octaves * notesPerOctave;
 
-      const baseFreq = 261.63; // C4
-      const semitoneOffset = (octave * 12) + pentatonicScale[scaleIndex];
-      const frequency = baseFreq * Math.pow(2, semitoneOffset / 12);
+        const noteIndex = Math.floor((participantIndex / totalParticipants) * totalNotes);
+        const octave = Math.floor(noteIndex / notesPerOctave);
+        const scaleIndex = noteIndex % notesPerOctave;
 
-      // Create oscillator with triangle wave (softer than sine)
-      const osc = audioContext.createOscillator();
-      osc.frequency.value = frequency;
-      osc.type = 'triangle';
+        const baseFreq = 261.63; // C4
+        const semitoneOffset = (octave * 12) + pentatonicScale[scaleIndex];
+        const frequency = baseFreq * Math.pow(2, semitoneOffset / 12);
 
-      // Create filter for warmer sound
-      const filter = audioContext.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.value = 2000;
-      filter.Q.value = 1;
+        // Create oscillator with triangle wave (softer than sine)
+        const osc = audioContext.createOscillator();
+        osc.frequency.value = frequency;
+        osc.type = 'triangle';
 
-      // Create gain node with envelope
-      const gainNode = audioContext.createGain();
+        // Create filter for warmer sound
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 2000;
+        filter.Q.value = 1;
 
-      // Stereo panning based on participant position
-      const panner = audioContext.createStereoPanner();
-      panner.pan.value = (participantIndex / totalParticipants) * 2 - 1; // -1 to 1
+        // Create gain node with envelope
+        const gainNode = audioContext.createGain();
 
-      // ADSR Envelope
-      const now = audioContext.currentTime;
-      const attackTime = 0.02;
-      const decayTime = 0.1;
-      const sustainLevel = 0.015; // Quieter overall
+        // Stereo panning based on participant position
+        const panner = audioContext.createStereoPanner();
+        panner.pan.value = (participantIndex / totalParticipants) * 2 - 1; // -1 to 1
 
-      gainNode.gain.setValueAtTime(0, now);
-      gainNode.gain.linearRampToValueAtTime(0.04, now + attackTime); // Attack
-      gainNode.gain.exponentialRampToValueAtTime(sustainLevel, now + attackTime + decayTime); // Decay to sustain
+        // ADSR Envelope
+        const now = audioContext.currentTime;
+        const attackTime = 0.02;
+        const decayTime = 0.1;
+        const sustainLevel = 0.015; // Quieter overall
 
-      // Connect: osc → filter → gain → panner → master
-      osc.connect(filter);
-      filter.connect(gainNode);
-      gainNode.connect(panner);
-      panner.connect(masterGain);
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(0.04, now + attackTime); // Attack
+        gainNode.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime); // Decay to sustain
 
-      osc.start();
+        // Connect: osc → filter → gain → panner → master
+        osc.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(panner);
+        panner.connect(masterGain);
 
-      activeOscillators.set(participantId, { osc, gainNode, filter, panner });
+        osc.start(now);
+
+        // Handle oscillator end event
+        osc.onended = () => {
+          activeOscillators.delete(participantId);
+        };
+
+        activeOscillators.set(participantId, { osc, gainNode, filter, panner, frequency });
+      } catch (error) {
+        console.error('Error playing note:', error);
+      }
     }
 
     function stopNote(participantId, completionTime) {
-      if (!isPlaying) return;
+      if (!isPlaying || !audioContext) return;
 
       const active = activeOscillators.get(participantId);
       if (!active) return;
 
-      const { osc, gainNode } = active;
+      try {
+        const { osc, gainNode, frequency } = active;
 
-      // Pitch shift based on completion speed
-      // Fast = pitch up, slow = pitch down
-      let pitchMultiplier;
-      if (completionTime < 2000) {
-        pitchMultiplier = 1.5; // Fast - up a fifth
-      } else if (completionTime < 5000) {
-        pitchMultiplier = 1.0; // Medium - same pitch
-      } else {
-        pitchMultiplier = 0.75; // Slow - down a fourth
-      }
+        // Pitch shift based on completion speed
+        // Fast = pitch up, slow = pitch down
+        let pitchMultiplier;
+        if (completionTime < 2000) {
+          pitchMultiplier = 1.5; // Fast - up a fifth
+        } else if (completionTime < 5000) {
+          pitchMultiplier = 1.0; // Medium - same pitch
+        } else {
+          pitchMultiplier = 0.75; // Slow - down a fourth
+        }
 
-      const currentFreq = osc.frequency.value;
-      osc.frequency.exponentialRampToValueAtTime(
-        currentFreq * pitchMultiplier,
-        audioContext.currentTime + 0.1
-      );
+        const now = audioContext.currentTime;
+        const pitchBendTime = 0.1;
+        const releaseTime = 0.3;
 
-      // Release
-      gainNode.gain.setValueAtTime(gainNode.gain.value, audioContext.currentTime);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+        // Cancel any scheduled changes
+        osc.frequency.cancelScheduledValues(now);
+        gainNode.gain.cancelScheduledValues(now);
 
-      setTimeout(() => {
+        // Pitch bend
+        const currentFreq = osc.frequency.value;
+        const targetFreq = currentFreq * pitchMultiplier;
+        osc.frequency.setValueAtTime(currentFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(
+          Math.max(20, targetFreq), // Ensure frequency stays above 20Hz
+          now + pitchBendTime
+        );
+
+        // Release envelope (use linear for safe ramp to zero)
+        const currentGain = gainNode.gain.value;
+        gainNode.gain.setValueAtTime(currentGain, now);
+        gainNode.gain.linearRampToValueAtTime(0, now + releaseTime);
+
+        // Stop oscillator after release completes
+        const stopTime = now + releaseTime + 0.05; // Small buffer
+        osc.stop(stopTime);
+
+        // Clean up from map (onended callback will also handle this)
+        setTimeout(() => {
+          activeOscillators.delete(participantId);
+        }, (releaseTime + 0.1) * 1000);
+      } catch (error) {
+        // If anything fails, force cleanup
+        console.error('Error stopping note:', error);
         try {
-          osc.stop();
+          active.osc.stop();
         } catch (e) {}
         activeOscillators.delete(participantId);
-      }, 400);
+      }
     }
 
     function visualize() {
