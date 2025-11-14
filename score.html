@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HCP - Performance Score</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Georgia', serif;
+      background: #fdfdf8;
+      color: #2a2a2a;
+      overflow-x: auto;
+      overflow-y: auto;
+    }
+
+    #container {
+      padding: 40px;
+      min-width: 100%;
+    }
+
+    #header {
+      text-align: center;
+      margin-bottom: 40px;
+      border-bottom: 2px solid #2a2a2a;
+      padding-bottom: 20px;
+    }
+
+    #header h1 {
+      font-size: 2em;
+      font-weight: 400;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+
+    #header .subtitle {
+      font-size: 0.9em;
+      font-style: italic;
+      color: #666;
+    }
+
+    #file-input-container {
+      text-align: center;
+      margin: 40px 0;
+    }
+
+    #file-input {
+      font-size: 0.9em;
+      padding: 10px;
+    }
+
+    #score-container {
+      margin-bottom: 60px;
+    }
+
+    .movement {
+      margin-bottom: 60px;
+      page-break-inside: avoid;
+    }
+
+    .movement-header {
+      font-size: 1.1em;
+      font-weight: 600;
+      margin-bottom: 5px;
+      letter-spacing: 0.05em;
+    }
+
+    .movement-tempo {
+      font-size: 0.85em;
+      font-style: italic;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .staff-system {
+      position: relative;
+      margin-bottom: 40px;
+    }
+
+    canvas {
+      display: block;
+      border: 1px solid #ddd;
+    }
+
+    #spectrogram-container {
+      margin-top: 60px;
+      border-top: 2px solid #2a2a2a;
+      padding-top: 40px;
+    }
+
+    #spectrogram-container h2 {
+      font-size: 1.3em;
+      font-weight: 400;
+      margin-bottom: 20px;
+      letter-spacing: 0.05em;
+    }
+
+    .analysis-section {
+      margin-bottom: 40px;
+    }
+
+    .analysis-section h3 {
+      font-size: 1em;
+      font-weight: 600;
+      margin-bottom: 10px;
+      letter-spacing: 0.05em;
+    }
+
+    .legend {
+      display: flex;
+      gap: 30px;
+      justify-content: center;
+      margin: 30px 0;
+      font-size: 0.85em;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .legend-symbol {
+      width: 20px;
+      height: 20px;
+      border: 1px solid #2a2a2a;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .loading {
+      text-align: center;
+      padding: 60px;
+      font-size: 1.1em;
+      color: #999;
+      font-style: italic;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="header">
+      <h1 id="title">Performance Score</h1>
+      <div class="subtitle" id="subtitle">Load a replay file to render the score</div>
+    </div>
+
+    <div id="file-input-container">
+      <input type="file" id="file-input" accept=".json">
+    </div>
+
+    <div class="loading" id="loading">Awaiting performance data...</div>
+
+    <div id="score-container" class="hidden"></div>
+
+    <div id="spectrogram-container" class="hidden">
+      <h2>Rhythmic Analysis</h2>
+
+      <div class="analysis-section">
+        <h3>Temporal Density</h3>
+        <canvas id="density-canvas"></canvas>
+      </div>
+
+      <div class="analysis-section">
+        <h3>Response Synchronization</h3>
+        <canvas id="sync-canvas"></canvas>
+      </div>
+
+      <div class="analysis-section">
+        <h3>Participant Activity Heatmap</h3>
+        <canvas id="heatmap-canvas"></canvas>
+      </div>
+    </div>
+
+    <div class="legend hidden" id="legend">
+      <div class="legend-item">
+        <div class="legend-symbol" style="background: #2a2a2a;"></div>
+        <div>Instruction (note attack)</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol" style="background: #fff; border: 2px solid #2a2a2a;"></div>
+        <div>Fast completion (fff)</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol" style="background: #999;"></div>
+        <div>Medium completion (mf)</div>
+      </div>
+      <div class="legend-item">
+        <div class="legend-symbol" style="background: #ccc;"></div>
+        <div>Slow completion (pp)</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let replayData = null;
+    let analysis = null;
+
+    // Load file
+    document.getElementById('file-input').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          replayData = JSON.parse(e.target.result);
+          renderScore();
+        } catch (error) {
+          console.error('Error loading replay:', error);
+          alert('Error loading replay file');
+        }
+      };
+      reader.readAsText(file);
+    });
+
+    function renderScore() {
+      console.log('Rendering score...');
+
+      // Analyze data
+      analysis = analyzePerformance(replayData);
+
+      // Update header
+      document.getElementById('title').textContent = replayData.metadata.name;
+      const duration = new Date(replayData.metadata.end_time) - new Date(replayData.metadata.start_time);
+      document.getElementById('subtitle').textContent =
+        `Duration: ${(duration / 1000).toFixed(1)}s | Participants: ${analysis.participantIds.length} | Movements: ${analysis.rounds.length}`;
+
+      // Hide loading
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('legend').classList.remove('hidden');
+
+      // Render staff notation
+      renderStaffNotation();
+
+      // Render spectrograms
+      renderSpectralAnalysis();
+
+      document.getElementById('score-container').classList.remove('hidden');
+      document.getElementById('spectrogram-container').classList.remove('hidden');
+    }
+
+    function analyzePerformance(data) {
+      const startTime = new Date(data.metadata.start_time);
+      const endTime = new Date(data.metadata.end_time);
+      const totalDuration = endTime - startTime;
+
+      // Collect participants
+      const participantSet = new Set();
+      data.events.forEach(event => {
+        if (event.participant_id) participantSet.add(event.participant_id);
+        if (event.data?.participants) {
+          event.data.participants.forEach(id => participantSet.add(id));
+        }
+      });
+      const participantIds = Array.from(participantSet).sort();
+
+      // Organize by rounds
+      const rounds = [];
+      let currentRound = null;
+
+      data.events.forEach(event => {
+        const eventTime = new Date(event.timestamp);
+        const relativeTime = eventTime - startTime;
+
+        if (event.type === 'round_start') {
+          currentRound = {
+            number: event.round_number,
+            strategy: event.data.strategy || '',
+            startTime: relativeTime,
+            endTime: null,
+            instructions: [],
+            completions: []
+          };
+          rounds.push(currentRound);
+        }
+
+        if (event.type === 'instruction_sent' && currentRound) {
+          currentRound.instructions.push({
+            time: relativeTime,
+            participants: event.data.participants || [],
+            task: event.data.task || ''
+          });
+        }
+
+        if (event.type === 'task_completed' && currentRound) {
+          currentRound.completions.push({
+            time: relativeTime,
+            participantId: event.participant_id,
+            completionTime: event.data.completion_time_ms
+          });
+        }
+
+        if (event.type === 'round_end' && currentRound) {
+          currentRound.endTime = relativeTime;
+        }
+      });
+
+      // Fix round end times
+      rounds.forEach((round, i) => {
+        if (!round.endTime) {
+          round.endTime = i < rounds.length - 1 ? rounds[i + 1].startTime : totalDuration;
+        }
+      });
+
+      return {
+        participantIds,
+        rounds,
+        totalDuration,
+        startTime
+      };
+    }
+
+    function renderStaffNotation() {
+      const container = document.getElementById('score-container');
+      container.innerHTML = '';
+
+      const STAFF_HEIGHT = 300;
+      const TIME_SCALE = 0.8; // pixels per ms
+      const STAFF_LINE_SPACING = 8;
+      const MARGIN_LEFT = 80;
+      const MARGIN_RIGHT = 40;
+
+      analysis.rounds.forEach((round, roundIndex) => {
+        const movement = document.createElement('div');
+        movement.className = 'movement';
+
+        // Movement header
+        const header = document.createElement('div');
+        header.className = 'movement-header';
+        header.textContent = `Movement ${round.number}`;
+        movement.appendChild(header);
+
+        const tempo = document.createElement('div');
+        tempo.className = 'movement-tempo';
+        tempo.textContent = round.strategy;
+        movement.appendChild(tempo);
+
+        // Create canvas for this round
+        const roundDuration = round.endTime - round.startTime;
+        const canvasWidth = MARGIN_LEFT + (roundDuration * TIME_SCALE) + MARGIN_RIGHT;
+        const canvas = document.createElement('canvas');
+        canvas.width = canvasWidth;
+        canvas.height = STAFF_HEIGHT;
+        canvas.className = 'staff-system';
+
+        const ctx = canvas.getContext('2d');
+
+        // Background
+        ctx.fillStyle = '#fdfdf8';
+        ctx.fillRect(0, 0, canvasWidth, STAFF_HEIGHT);
+
+        // Draw staff lines (one per participant, but group them)
+        const participantCount = analysis.participantIds.length;
+        const staffSpacing = Math.max(4, Math.min(12, (STAFF_HEIGHT - 60) / participantCount));
+
+        ctx.strokeStyle = '#ccc';
+        ctx.lineWidth = 0.5;
+
+        for (let i = 0; i < participantCount; i++) {
+          const y = 30 + i * staffSpacing;
+          ctx.beginPath();
+          ctx.moveTo(MARGIN_LEFT, y);
+          ctx.lineTo(canvasWidth - MARGIN_RIGHT, y);
+          ctx.stroke();
+        }
+
+        // Draw vertical bar line at start
+        ctx.strokeStyle = '#2a2a2a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(MARGIN_LEFT, 20);
+        ctx.lineTo(MARGIN_LEFT, STAFF_HEIGHT - 20);
+        ctx.stroke();
+
+        // Draw vertical bar line at end
+        ctx.beginPath();
+        ctx.moveTo(canvasWidth - MARGIN_RIGHT, 20);
+        ctx.lineTo(canvasWidth - MARGIN_RIGHT, STAFF_HEIGHT - 20);
+        ctx.stroke();
+
+        // Draw clef (just decorative)
+        ctx.font = '24px Georgia';
+        ctx.fillStyle = '#2a2a2a';
+        ctx.fillText('𝄞', MARGIN_LEFT - 60, 50);
+
+        // Draw instructions as note attacks (vertical stems)
+        round.instructions.forEach(instruction => {
+          const x = MARGIN_LEFT + (instruction.time - round.startTime) * TIME_SCALE;
+
+          instruction.participants.forEach(participantId => {
+            const participantIndex = analysis.participantIds.indexOf(participantId);
+            if (participantIndex === -1) return;
+
+            const y = 30 + participantIndex * staffSpacing;
+
+            // Draw stem (note attack)
+            ctx.strokeStyle = '#2a2a2a';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(x, y - 8);
+            ctx.lineTo(x, y + 8);
+            ctx.stroke();
+
+            // Draw notehead
+            ctx.fillStyle = '#2a2a2a';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 3, 2.5, Math.PI / 4, 0, Math.PI * 2);
+            ctx.fill();
+          });
+        });
+
+        // Draw completions as noteheads with dynamics
+        round.completions.forEach(completion => {
+          const x = MARGIN_LEFT + (completion.time - round.startTime) * TIME_SCALE;
+          const participantIndex = analysis.participantIds.indexOf(completion.participantId);
+          if (participantIndex === -1) return;
+
+          const y = 30 + participantIndex * staffSpacing;
+
+          // Size and opacity based on speed (dynamics)
+          let size, opacity, fill;
+          if (completion.completionTime < 2000) {
+            size = 4; // fff - fortississimo
+            opacity = 1;
+            fill = '#2a2a2a';
+          } else if (completion.completionTime < 5000) {
+            size = 3; // mf - mezzo-forte
+            opacity = 0.7;
+            fill = '#666';
+          } else {
+            size = 2; // pp - pianissimo
+            opacity = 0.4;
+            fill = '#999';
+          }
+
+          ctx.fillStyle = fill;
+          ctx.globalAlpha = opacity;
+          ctx.beginPath();
+          ctx.arc(x, y, size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        });
+
+        movement.appendChild(canvas);
+        container.appendChild(movement);
+      });
+    }
+
+    function renderSpectralAnalysis() {
+      // 1. Temporal Density
+      renderTemporalDensity();
+
+      // 2. Response Synchronization
+      renderSynchronization();
+
+      // 3. Participant Heatmap
+      renderHeatmap();
+    }
+
+    function renderTemporalDensity() {
+      const canvas = document.getElementById('density-canvas');
+      const WIDTH = 1200;
+      const HEIGHT = 200;
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#fdfdf8';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // Calculate event density over time
+      const binCount = 100;
+      const binSize = analysis.totalDuration / binCount;
+      const density = new Array(binCount).fill(0);
+
+      analysis.rounds.forEach(round => {
+        round.completions.forEach(completion => {
+          const binIndex = Math.floor(completion.time / binSize);
+          if (binIndex >= 0 && binIndex < binCount) {
+            density[binIndex]++;
+          }
+        });
+      });
+
+      const maxDensity = Math.max(...density, 1);
+
+      // Draw density curve
+      ctx.strokeStyle = '#2a2a2a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      for (let i = 0; i < binCount; i++) {
+        const x = (i / binCount) * WIDTH;
+        const y = HEIGHT - (density[i] / maxDensity) * (HEIGHT - 40);
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      }
+      ctx.stroke();
+
+      // Fill under curve
+      ctx.lineTo(WIDTH, HEIGHT);
+      ctx.lineTo(0, HEIGHT);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(42, 42, 42, 0.1)';
+      ctx.fill();
+
+      // Axes
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, HEIGHT - 20);
+      ctx.lineTo(WIDTH, HEIGHT - 20);
+      ctx.stroke();
+
+      // Labels
+      ctx.fillStyle = '#666';
+      ctx.font = '11px Georgia';
+      ctx.fillText('Time →', WIDTH - 60, HEIGHT - 5);
+      ctx.fillText('Events', 5, 15);
+    }
+
+    function renderSynchronization() {
+      const canvas = document.getElementById('sync-canvas');
+      const WIDTH = 1200;
+      const HEIGHT = 200;
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#fdfdf8';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      // Calculate synchronization (how clustered are completions in time?)
+      const windowSize = 500; // ms
+      const binCount = Math.floor(analysis.totalDuration / windowSize);
+      const sync = new Array(binCount).fill(0);
+
+      analysis.rounds.forEach(round => {
+        for (let i = 0; i < binCount; i++) {
+          const windowStart = i * windowSize;
+          const windowEnd = (i + 1) * windowSize;
+
+          const completionsInWindow = round.completions.filter(c =>
+            c.time >= windowStart && c.time < windowEnd
+          ).length;
+
+          if (completionsInWindow > 1) {
+            // Higher sync value when multiple completions happen in same window
+            sync[i] += completionsInWindow * completionsInWindow;
+          }
+        }
+      });
+
+      const maxSync = Math.max(...sync, 1);
+
+      // Draw as bars
+      const barWidth = WIDTH / binCount;
+
+      for (let i = 0; i < binCount; i++) {
+        const x = i * barWidth;
+        const barHeight = (sync[i] / maxSync) * (HEIGHT - 40);
+        const y = HEIGHT - 20 - barHeight;
+
+        ctx.fillStyle = sync[i] > maxSync * 0.5 ? '#2a2a2a' : '#999';
+        ctx.fillRect(x, y, barWidth - 1, barHeight);
+      }
+
+      // Axes
+      ctx.strokeStyle = '#999';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, HEIGHT - 20);
+      ctx.lineTo(WIDTH, HEIGHT - 20);
+      ctx.stroke();
+
+      // Labels
+      ctx.fillStyle = '#666';
+      ctx.font = '11px Georgia';
+      ctx.fillText('Time →', WIDTH - 60, HEIGHT - 5);
+      ctx.fillText('Clustering', 5, 15);
+    }
+
+    function renderHeatmap() {
+      const canvas = document.getElementById('heatmap-canvas');
+      const WIDTH = 1200;
+      const participantCount = analysis.participantIds.length;
+      const HEIGHT = Math.max(300, participantCount * 3);
+      canvas.width = WIDTH;
+      canvas.height = HEIGHT;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#fdfdf8';
+      ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+      const cellHeight = HEIGHT / participantCount;
+      const timeScale = WIDTH / analysis.totalDuration;
+
+      // Build activity map
+      const activityMap = new Map();
+      analysis.participantIds.forEach(id => {
+        activityMap.set(id, []);
+      });
+
+      analysis.rounds.forEach(round => {
+        round.completions.forEach(completion => {
+          const activities = activityMap.get(completion.participantId) || [];
+          activities.push({
+            time: completion.time,
+            speed: completion.completionTime
+          });
+          activityMap.set(completion.participantId, activities);
+        });
+      });
+
+      // Draw heatmap
+      analysis.participantIds.forEach((participantId, index) => {
+        const y = index * cellHeight;
+        const activities = activityMap.get(participantId) || [];
+
+        // Background row
+        ctx.fillStyle = index % 2 === 0 ? '#f8f8f8' : '#fdfdf8';
+        ctx.fillRect(0, y, WIDTH, cellHeight);
+
+        // Activity marks
+        activities.forEach(activity => {
+          const x = activity.time * timeScale;
+
+          let color, alpha;
+          if (activity.speed < 2000) {
+            color = '#2a2a2a';
+            alpha = 0.9;
+          } else if (activity.speed < 5000) {
+            color = '#666';
+            alpha = 0.6;
+          } else {
+            color = '#999';
+            alpha = 0.3;
+          }
+
+          ctx.fillStyle = color;
+          ctx.globalAlpha = alpha;
+          ctx.fillRect(x - 1, y, 2, cellHeight);
+        });
+        ctx.globalAlpha = 1;
+      });
+
+      // Grid lines
+      ctx.strokeStyle = '#ddd';
+      ctx.lineWidth = 0.5;
+      for (let i = 0; i <= participantCount; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, i * cellHeight);
+        ctx.lineTo(WIDTH, i * cellHeight);
+        ctx.stroke();
+      }
+
+      // Labels
+      ctx.fillStyle = '#666';
+      ctx.font = '11px Georgia';
+      ctx.fillText('Participants ↓', 5, HEIGHT - 5);
+      ctx.fillText('Time →', WIDTH - 60, HEIGHT - 5);
+    }
+  </script>
+</body>
+</html>
