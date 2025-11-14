@@ -150,6 +150,83 @@
     .hidden {
       display: none !important;
     }
+
+    #console {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 100;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 15px;
+      border-radius: 10px;
+      border: 1px solid #333;
+      width: 400px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8em;
+    }
+
+    #console h3 {
+      margin: 0 0 10px 0;
+      font-size: 0.9em;
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    #console-log {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .console-entry {
+      border-left: 2px solid #333;
+      padding-left: 10px;
+      opacity: 0.9;
+      line-height: 1.4;
+    }
+
+    .console-entry.round-start {
+      border-left-color: #9effc7;
+      color: #9effc7;
+    }
+
+    .console-entry.instruction {
+      border-left-color: #66ffd1;
+      color: #fff;
+    }
+
+    .console-entry.reflection {
+      border-left-color: #ffbb55;
+      color: #ffbb55;
+      font-style: italic;
+    }
+
+    .console-entry .timestamp {
+      opacity: 0.5;
+      font-size: 0.85em;
+      margin-right: 8px;
+    }
+
+    #console::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    #console::-webkit-scrollbar-track {
+      background: #1a1a1a;
+    }
+
+    #console::-webkit-scrollbar-thumb {
+      background: #333;
+      border-radius: 3px;
+    }
+
+    #console::-webkit-scrollbar-thumb:hover {
+      background: #444;
+    }
   </style>
 </head>
 <body>
@@ -188,6 +265,11 @@
   <div id="info" class="hidden">
     <div class="event-type" id="event-type"></div>
     <div class="event-details" id="event-details"></div>
+  </div>
+
+  <div id="console" class="hidden">
+    <h3>Agent Console</h3>
+    <div id="console-log"></div>
   </div>
 
   <script>
@@ -559,6 +641,10 @@
       `;
 
       showEventInfo(`Round ${currentRound} Start`, details);
+
+      // Add to console
+      const strategy = event.data.strategy || 'N/A';
+      addConsoleEntry(`Round ${currentRound} Start: ${strategy}`, 'round-start');
     }
 
     function handleInstructionSent(event) {
@@ -603,6 +689,9 @@
       }
 
       showEventInfo('Instruction Sent', `"${task}" to ${groupParticipants.length} participants (${targetPercent}%)`);
+
+      // Add to console
+      addConsoleEntry(`Instruction: "${task}" to ${groupParticipants.length} participants`, 'instruction');
     }
 
     function handleTaskCompleted(event) {
@@ -632,6 +721,9 @@
       fadeOutAllConnections();
 
       showEventInfo(`Round ${roundNumber} End`, `${reflection} (${sentiment})`);
+
+      // Add to console
+      addConsoleEntry(`${reflection} (${sentiment})`, 'reflection');
     }
 
     function handlePerformanceEnd(event) {
@@ -653,6 +745,24 @@
       document.getElementById('event-type').textContent = type;
       document.getElementById('event-details').innerHTML = details;
       document.getElementById('info').classList.remove('hidden');
+    }
+
+    function addConsoleEntry(message, type = 'instruction') {
+      const consoleLog = document.getElementById('console-log');
+      const entry = document.createElement('div');
+      entry.className = `console-entry ${type}`;
+
+      const timestamp = new Date().toLocaleTimeString();
+      entry.innerHTML = `<span class="timestamp">[${timestamp}]</span>${message}`;
+
+      consoleLog.appendChild(entry);
+
+      // Auto-scroll to bottom
+      const consoleElement = document.getElementById('console');
+      consoleElement.scrollTop = consoleElement.scrollHeight;
+
+      // Show console if hidden
+      consoleElement.classList.remove('hidden');
     }
 
     // Load performance from file
