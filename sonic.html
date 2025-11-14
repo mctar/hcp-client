@@ -179,17 +179,18 @@
       <div>• Mapped to pentatonic scale across 3 octaves</div>
       <div>• Instruction = note attack / Completion = pitch bend + release</div>
       <div>• Stereo panning by participant position</div>
-      <div><strong>Data-Derived Harmony:</strong></div>
-      <div>• Bass/pad roots derived from completion time patterns</div>
-      <div>• Fast avg times → higher/brighter harmony</div>
-      <div>• Slow avg times → lower/darker harmony</div>
-      <div>• High variance → minor intervals, more bass</div>
-      <div>• Low variance → major intervals, more pad</div>
-      <div><strong>Group Voicing:</strong></div>
-      <div>• Large groups (>5) = major third harmonics</div>
-      <div>• Medium groups (3-5) = perfect fifth harmonics</div>
-      <div>• Small groups = subtle detuning</div>
-      <div>• Groups >8 participants = arpeggiated attack</div>
+      <div><strong>Minimalist Composition (Glass/Cage):</strong></div>
+      <div>• Repeating arpeggio patterns (150 BPM, pentatonic)</div>
+      <div>• Major mode = major pentatonic arpeggio</div>
+      <div>• Minor mode = minor pentatonic arpeggio</div>
+      <div>• Soft, bell-like timbres with long decay</div>
+      <div>• Ambient noise texture (subtle, filtered)</div>
+      <div>• Spacious, meditative envelopes</div>
+      <div><strong>Data-Driven Elements:</strong></div>
+      <div>• Harmony derived from completion patterns</div>
+      <div>• Group sizes create chord voicings</div>
+      <div>• Groups >6 cascade (60ms spacing)</div>
+      <div>• Completion speed affects pitch bend</div>
     </div>
   </div>
 
@@ -218,6 +219,17 @@
     let ambientPadGain = null;
     let pulseOsc = null;
     let pulseGain = null;
+
+    // Glass-style arpeggio elements
+    let arpeggioOscs = [];
+    let arpeggioInterval = null;
+    let currentArpPattern = [];
+    let arpIndex = 0;
+
+    // Texture/noise for Cage-like ambience
+    let noiseNode = null;
+    let noiseGain = null;
+    let noiseFilter = null;
 
     // Musical scale (Pentatonic C major - more pleasant)
     const pentatonicScale = [0, 2, 4, 7, 9]; // Scale degrees
@@ -311,6 +323,32 @@
       pulseGain.connect(masterGain);
 
       pulseOsc.start();
+
+      // Create ambient noise texture (Cage-like)
+      const bufferSize = audioContext.sampleRate * 2;
+      const noiseBuffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+      const output = noiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+      }
+
+      noiseNode = audioContext.createBufferSource();
+      noiseNode.buffer = noiseBuffer;
+      noiseNode.loop = true;
+
+      noiseFilter = audioContext.createBiquadFilter();
+      noiseFilter.type = 'bandpass';
+      noiseFilter.frequency.value = 800;
+      noiseFilter.Q.value = 0.5;
+
+      noiseGain = audioContext.createGain();
+      noiseGain.gain.value = 0; // Start silent
+
+      noiseNode.connect(noiseFilter);
+      noiseFilter.connect(noiseGain);
+      noiseGain.connect(masterGain);
+
+      noiseNode.start();
     }
 
     function analyzeRoundHarmony(roundEvents) {
@@ -350,33 +388,128 @@
         const harmony = analyzeRoundHarmony(roundData.events);
 
         // Bass drone follows derived root
-        const bassFreq = 65.41 * Math.pow(2, harmony.root / 12); // C2 + semitones
+        const bassFreq = 65.41 * Math.pow(2, harmony.root / 12);
 
         const now = audioContext.currentTime;
         bassDrone.frequency.exponentialRampToValueAtTime(bassFreq, now + 2);
 
-        // Ambient pad interval depends on mode
-        // Major = perfect fifth (1.5x), minor = minor sixth (1.587x)
+        // Ambient pad interval
         const intervalMultiplier = harmony.mode === 'major' ? 1.5 : 1.587;
         const padFreq = bassFreq * intervalMultiplier;
         ambientPad.frequency.exponentialRampToValueAtTime(padFreq, now + 2);
 
-        // Bass drone intensity based on variance (more variance = stronger bass foundation)
+        // Bass drone intensity
         const droneGain = 0.05 + (harmony.variance * 0.05);
         bassDroneGain.gain.cancelScheduledValues(now);
         bassDroneGain.gain.setValueAtTime(bassDroneGain.gain.value, now);
         bassDroneGain.gain.linearRampToValueAtTime(droneGain, now + 1);
 
-        // Pad gain inversely related to variance (consonant = more pad)
+        // Pad gain
         const padGain = 0.03 - (harmony.variance * 0.015);
         ambientPadGain.gain.cancelScheduledValues(now);
         ambientPadGain.gain.setValueAtTime(ambientPadGain.gain.value, now);
         ambientPadGain.gain.linearRampToValueAtTime(padGain, now + 1.5);
 
+        // Subtle noise texture (Cage-like ambience)
+        const noiseLevel = 0.001 + (harmony.variance * 0.002);
+        noiseGain.gain.cancelScheduledValues(now);
+        noiseGain.gain.setValueAtTime(noiseGain.gain.value, now);
+        noiseGain.gain.linearRampToValueAtTime(noiseLevel, now + 2);
+
+        // Start Glass-style arpeggio pattern
+        startArpeggio(bassFreq, harmony.mode);
+
         console.log(`Round ${roundNumber}: Root=${harmony.root}, Mode=${harmony.mode}, Variance=${harmony.variance.toFixed(2)}`);
       } catch (error) {
         console.error('Error setting round harmony:', error);
       }
+    }
+
+    function startArpeggio(rootFreq, mode) {
+      // Stop existing arpeggio
+      stopArpeggio();
+
+      // Build arpeggio pattern (Glass-style repetitive)
+      // Pentatonic arpeggio pattern derived from root
+      const baseFreq = rootFreq * 4; // Up 2 octaves for melodic range
+
+      if (mode === 'major') {
+        // Major pentatonic: 1 2 3 5 6 (in semitones: 0, 2, 4, 7, 9)
+        currentArpPattern = [
+          baseFreq,                                    // Root
+          baseFreq * Math.pow(2, 2/12),               // Major 2nd
+          baseFreq * Math.pow(2, 4/12),               // Major 3rd
+          baseFreq * Math.pow(2, 7/12),               // Perfect 5th
+          baseFreq * Math.pow(2, 4/12),               // Major 3rd (return)
+          baseFreq * Math.pow(2, 2/12),               // Major 2nd (return)
+        ];
+      } else {
+        // Minor pentatonic: 1 b3 4 5 b7 (in semitones: 0, 3, 5, 7, 10)
+        currentArpPattern = [
+          baseFreq,                                    // Root
+          baseFreq * Math.pow(2, 3/12),               // Minor 3rd
+          baseFreq * Math.pow(2, 5/12),               // Perfect 4th
+          baseFreq * Math.pow(2, 7/12),               // Perfect 5th
+          baseFreq * Math.pow(2, 5/12),               // Perfect 4th (return)
+          baseFreq * Math.pow(2, 3/12),               // Minor 3rd (return)
+        ];
+      }
+
+      arpIndex = 0;
+
+      // Start repeating arpeggio (Glass-style tempo)
+      arpeggioInterval = setInterval(() => {
+        playArpeggioNote(currentArpPattern[arpIndex]);
+        arpIndex = (arpIndex + 1) % currentArpPattern.length;
+      }, 400); // 150 BPM, quarter note = 400ms
+    }
+
+    function playArpeggioNote(frequency) {
+      if (!isPlaying || !audioContext) return;
+
+      try {
+        const osc = audioContext.createOscillator();
+        osc.frequency.value = frequency;
+        osc.type = 'sine'; // Pure, bell-like
+
+        const gain = audioContext.createGain();
+        const now = audioContext.currentTime;
+
+        // Bell-like envelope
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.015, now + 0.01); // Fast attack
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8); // Long decay
+
+        osc.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(now);
+        osc.stop(now + 1);
+
+        arpeggioOscs.push({ osc, gain });
+
+        // Clean up old oscillators
+        setTimeout(() => {
+          const idx = arpeggioOscs.findIndex(a => a.osc === osc);
+          if (idx >= 0) arpeggioOscs.splice(idx, 1);
+        }, 1100);
+      } catch (error) {
+        console.error('Error playing arpeggio note:', error);
+      }
+    }
+
+    function stopArpeggio() {
+      if (arpeggioInterval) {
+        clearInterval(arpeggioInterval);
+        arpeggioInterval = null;
+      }
+      arpeggioOscs.forEach(({ osc }) => {
+        try {
+          osc.stop();
+        } catch (e) {}
+      });
+      arpeggioOscs = [];
+      arpIndex = 0;
     }
 
     function playPulse() {
@@ -408,6 +541,13 @@
         ambientPadGain.gain.cancelScheduledValues(now);
         ambientPadGain.gain.setValueAtTime(ambientPadGain.gain.value, now);
         ambientPadGain.gain.linearRampToValueAtTime(0, now + 2);
+
+        noiseGain.gain.cancelScheduledValues(now);
+        noiseGain.gain.setValueAtTime(noiseGain.gain.value, now);
+        noiseGain.gain.linearRampToValueAtTime(0, now + 2);
+
+        // Stop arpeggio
+        stopArpeggio();
       } catch (error) {
         console.error('Error fading out scaffolding:', error);
       }
@@ -513,6 +653,9 @@
 
       // Fade out scaffolding
       fadeOutScaffolding();
+
+      // Stop arpeggio
+      stopArpeggio();
 
       // Stop visualization
       if (animationId) {
@@ -676,9 +819,9 @@
           }, relativeTime);
           scheduledEvents.push(pulseTimeoutId);
 
-          // Arpeggiate larger groups for harmonic clarity
-          const shouldArpeggiate = groupSize > 8;
-          const arpDelay = shouldArpeggiate ? 25 : 0; // milliseconds between notes
+          // Arpeggiate larger groups for Glass-like cascades
+          const shouldArpeggiate = groupSize > 6; // More arpeggio, more pattern
+          const arpDelay = shouldArpeggiate ? 60 : 0; // Slower, more deliberate spacing
 
           participants.forEach((participantId, idx) => {
             const participantIndex = participantToIndex.get(participantId);
@@ -812,14 +955,14 @@
         const panner = audioContext.createStereoPanner();
         panner.pan.value = (participantIndex / totalParticipants) * 2 - 1;
 
-        // ADSR Envelope - larger groups have longer attack
+        // Glass/Cage-inspired envelope - softer, more spacious
         const now = audioContext.currentTime;
-        const attackTime = 0.02 + (groupSize * 0.005);
-        const decayTime = 0.1;
-        const sustainLevel = 0.012 + (groupSize * 0.002); // Louder for larger groups
+        const attackTime = 0.05 + (groupSize * 0.01); // Slower attack
+        const decayTime = 0.15;
+        const sustainLevel = 0.008 + (groupSize * 0.001); // Quieter, more ambient
 
         gainNode.gain.setValueAtTime(0, now);
-        gainNode.gain.linearRampToValueAtTime(0.04, now + attackTime);
+        gainNode.gain.linearRampToValueAtTime(0.025, now + attackTime); // Softer peak
         gainNode.gain.exponentialRampToValueAtTime(Math.max(0.001, sustainLevel), now + attackTime + decayTime);
 
         // Connect: oscs → gains → filter → gain → panner → master
