@@ -186,6 +186,7 @@
       <div>• Soft, bell-like timbres with long decay</div>
       <div>• Ambient noise texture (subtle, filtered)</div>
       <div>• Spacious, meditative envelopes</div>
+      <div>• Heartbeat bass (LUB-dub pattern, BPM from data)</div>
       <div><strong>Data-Driven Elements:</strong></div>
       <div>• Harmony derived from completion patterns</div>
       <div>• Group sizes create chord voicings</div>
@@ -230,6 +231,10 @@
     let noiseNode = null;
     let noiseGain = null;
     let noiseFilter = null;
+
+    // Heartbeat bass and beat elements
+    let heartbeatInterval = null;
+    let heartbeatBPM = 60; // Default 60 BPM, will be derived from data
 
     // Musical scale (Pentatonic C major - more pleasant)
     const pentatonicScale = [0, 2, 4, 7, 9]; // Scale degrees
@@ -512,6 +517,75 @@
       arpIndex = 0;
     }
 
+    function playHeartbeatKick(intensity = 1.0) {
+      if (!isPlaying || !audioContext) return;
+
+      try {
+        // Bass kick drum using sine wave with pitch envelope
+        const osc = audioContext.createOscillator();
+        osc.type = 'sine';
+
+        const gain = audioContext.createGain();
+        const now = audioContext.currentTime;
+
+        // Kick drum: start at higher pitch, drop to bass
+        const startFreq = 150;
+        const endFreq = 45; // Deep bass
+        osc.frequency.setValueAtTime(startFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(endFreq, now + 0.05);
+
+        // Tight envelope for punchy kick
+        const peakGain = 0.25 * intensity; // Louder than other elements for impact
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(peakGain, now + 0.005); // Fast attack
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3); // Quick decay
+
+        // Add slight distortion/warmth with filter
+        const filter = audioContext.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 200;
+        filter.Q.value = 1;
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } catch (error) {
+        console.error('Error playing heartbeat kick:', error);
+      }
+    }
+
+    function startHeartbeat(bpm) {
+      stopHeartbeat();
+
+      heartbeatBPM = bpm;
+      const beatInterval = (60 / bpm) * 1000; // milliseconds per beat
+
+      // Heartbeat pattern: LUB-dub (strong-weak)
+      let beatCount = 0;
+
+      heartbeatInterval = setInterval(() => {
+        if (!isPlaying) return;
+
+        const isStrongBeat = beatCount % 2 === 0;
+        const intensity = isStrongBeat ? 1.0 : 0.6; // LUB-dub pattern
+
+        playHeartbeatKick(intensity);
+        beatCount++;
+      }, beatInterval);
+
+      console.log(`Heartbeat started at ${bpm} BPM`);
+    }
+
+    function stopHeartbeat() {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        heartbeatInterval = null;
+      }
+    }
+
     function playPulse() {
       if (!audioContext || !pulseGain) return;
 
@@ -546,8 +620,9 @@
         noiseGain.gain.setValueAtTime(noiseGain.gain.value, now);
         noiseGain.gain.linearRampToValueAtTime(0, now + 2);
 
-        // Stop arpeggio
+        // Stop arpeggio and heartbeat
         stopArpeggio();
+        stopHeartbeat();
       } catch (error) {
         console.error('Error fading out scaffolding:', error);
       }
@@ -654,8 +729,9 @@
       // Fade out scaffolding
       fadeOutScaffolding();
 
-      // Stop arpeggio
+      // Stop arpeggio and heartbeat
       stopArpeggio();
+      stopHeartbeat();
 
       // Stop visualization
       if (animationId) {
@@ -754,10 +830,48 @@
       document.getElementById('progress-value').textContent = 'Stopped';
     }
 
+    function calculateHeartbeatBPM() {
+      // Derive BPM from performance characteristics
+      const performanceStart = new Date(replayData.metadata.start_time);
+      const performanceEnd = new Date(replayData.metadata.end_time);
+      const durationSeconds = (performanceEnd - performanceStart) / 1000;
+
+      // Count rounds
+      const roundStarts = replayData.events.filter(e => e.type === 'round_start');
+      const numRounds = roundStarts.length;
+
+      if (numRounds === 0 || durationSeconds === 0) {
+        return 60; // Default to 60 BPM
+      }
+
+      // Calculate average round duration
+      const avgRoundDuration = durationSeconds / numRounds;
+
+      // Map round duration to BPM
+      // Fast rounds (5s) = 80 BPM (faster heartbeat, more active)
+      // Medium rounds (15s) = 60 BPM (normal resting heartbeat)
+      // Slow rounds (30s+) = 50 BPM (slower, more meditative)
+      let bpm;
+      if (avgRoundDuration < 10) {
+        bpm = 75 + (10 - avgRoundDuration) * 1; // 75-80 BPM
+      } else if (avgRoundDuration < 20) {
+        bpm = 60 + (20 - avgRoundDuration) * 1.5; // 60-75 BPM
+      } else {
+        bpm = Math.max(50, 60 - (avgRoundDuration - 20) * 0.5); // 50-60 BPM
+      }
+
+      console.log(`Performance BPM: ${bpm.toFixed(1)} (avg round: ${avgRoundDuration.toFixed(1)}s)`);
+      return Math.round(bpm);
+    }
+
     function sonifyPerformance() {
       const performanceStart = new Date(replayData.metadata.start_time);
       const now = audioContext.currentTime;
       startTime = Date.now();
+
+      // Start heartbeat with derived BPM
+      const bpm = calculateHeartbeatBPM();
+      startHeartbeat(bpm);
 
       // Build participant ID to index mapping
       const participantIds = new Set();
